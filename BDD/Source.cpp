@@ -11,8 +11,9 @@
 #include <stack>
 #include <chrono>
 
-#define DIRECTIONS
+#include "WorldMap.h"
 
+#define DIRECTIONS
 
 using namespace std;
 
@@ -21,16 +22,19 @@ ofstream out;
 //N_DEPEND_ON_CELL*N_COLUMN*N_ROW+N_NOT_DEPEND_ON_CELL+18
 #define N_DEPEND_ON_CELL 9
 #define N_NOT_DEPEND_ON_CELL 18
-#define N_COLUMN 4
-#define N_ROW 4
-#define N N_COLUMN*N_ROW
+
 #define N_FUNCTIONS_AT_CELL (3 + 14*4)
 #define N_FUNCTIONS_IN_FIELD (4 + 3*4) // до percept здесь было 4+3*2
 #define N_VAR 207
 
+int find_unvisited(bdd task, int current_cell); //прохожусь по соседям клетки, смотри те, которые еще не проверены, отправляю их на проверку
+bdd ask_and_send_percept(vector<vector <int>> Enviroment, int current_cell); // из i-ой клетки достает восприятие (percept)
+int check_for_safety(bdd task, int current_cell); //проверяет клетку на безопасность
+int Enviroment(bdd task, int current_cell); //сочетает две функции: поиск соседей и проверку на безопасность
+void find_path(bdd relation, bdd first_state, bdd* q, bdd* qq, bdd wished_state, vector<int> answer, vector<bdd> visited, bdd& direction);
+int move(int cell, string action, bdd& direction);
 void fun(char* varset, int size); //функция, используемая для вывода решений
 void print(); // Печать в файл
-
 
 //переменные восприятия среды
 bdd Stench;
@@ -44,12 +48,11 @@ bdd S[N]; //запах
 bdd W[N]; //вампус
 bdd G[N]; //золото
 
-// направления для символьных вычислений
-bdd n;
-bdd e;
-bdd s;
-bdd w;
-
+// направления, куда смотрит агент, для символьных вычислений
+bdd n; // Север
+bdd e; // Запад
+bdd s; // Юг
+bdd w; // Восток
 
 //переменные состояния среды, ЗАВИСЯТ ОТ ВРЕМЕНИ
 bdd HaveArrow;//иметь стрелу
@@ -106,18 +109,18 @@ bdd Shoot;
 bdd Shoot_next;
 
 bool checked_cells[N] = { true, false, false, false,
-						false, false, false, false,
-						false, false, false, false,
-						false, false, false, false };  //массив проверенных клеток
+                          false, false, false, false,
+                          false, false, false, false,
+                          false, false, false, false };  //массив проверенных клеток
 
 bool not_safe_cells[N]; //массив небезопасных клеток
 
 bool unknown_cells[N]; //пока не можем говорить, безопасные или нет
 
 bool safe_cells[N] = { true, false, false, false,
-						false, false, false, false,
-						false, false, false, false, 
-						false, false, false, false};
+                       false, false, false, false,
+                       false, false, false, false, 
+                       false, false, false, false};
 
 stack <int> cells[N]; //стек для хранения предыдущей клетки
 
@@ -125,179 +128,108 @@ stack <int> cells[N]; //стек для хранения предыдущей клетки
 bool flag = false;
 bool to_stop_recursion;
 
-vector<std::vector<int>> real_cave2 = { {1}, {0}, {33}, {3}, //карта 4х4
-										{0}, {33}, {3}, {33},
-										{0}, {22}, {33}, {0},
-										{4,22}, {2}, {22}, {0} };
-
-vector<std::vector<int>> real_cave3 = { {1}, {33}, {3},  //карта 3х3
-										{33}, {0}, {33,4},
-										{3}, {33}, {3,2}};
-
-vector<int> neighbours(int cell) //выявляет для клетки соседей
+// Определение соседей относительно клетки cell
+vector<int> neighbours(int cell)
 {
-	vector <int> neighbours;
-	if (cell == 0) //для 0
-	{
-		neighbours = { cell + 1, cell + N_ROW };
-	}
-	else if (cell / N_COLUMN == 0 && cell != N_COLUMN - 1 && cell != 0) // для 1 и 2
-	{
-		neighbours = { cell - 1, cell + 1, cell + N_ROW };
-	}
-	else if (cell / N_COLUMN == 0 && cell == N_COLUMN - 1) // для 3
-	{
-		neighbours = { cell - 1, cell + N_ROW };
-	}
+    vector <int> neighbours;
 
-	else if (cell % N_COLUMN == 0 && cell != N - N_COLUMN && cell != 0) // для 4 и 8
-	{
-		neighbours = { cell + 1, cell + N_ROW, cell - N_ROW };
-	}
-	else if (cell % N_COLUMN != 0 && cell % N_COLUMN != N_COLUMN - cell && cell / N_COLUMN != 0 && cell / N_COLUMN != N_COLUMN - 1) //для 5, 6, 9, 10
-	{
-		neighbours = { cell + 1, cell - 1, cell + N_ROW, cell - N_ROW };
-	}
-	else if (cell % N_COLUMN == N_COLUMN - cell && cell != N - 1) //для 7 и 11
-	{
-		neighbours = { cell - N_ROW, cell + N_ROW, cell - 1 };
-	}
-	else if (cell % N_COLUMN == 0 && cell == N - N_COLUMN) //для 12
-	{
-		neighbours = { cell - N_ROW, cell + 1 };
-	}
-	else if (cell / N_ROW == N_ROW - 1 && cell != N - N_ROW && cell != N - 1)
-	{
-		neighbours = { cell - 1, cell + 1, cell - N_ROW };
-	}
-	else if (cell % N_COLUMN == N_COLUMN - 1 && cell == N - 1)
-	{
-		neighbours = { cell - 1, cell - N_ROW };
-	}
-	return neighbours;
+    // если ячейка не в крайнем левом столбце
+    if (cell % N_COLUMN != 0)
+    {
+        neighbours.push_back(cell - 1);
+    }
+    // если ячейка не в крайнем правом столбце
+    if ((cell + 1) % N_COLUMN != 0)
+    {
+        neighbours.push_back(cell + 1);
+    }
+    // если ячейка не на самой нижней строке
+    if (cell < N_COLUMN * (N_ROW - 1))
+    {
+        neighbours.push_back(cell + N_COLUMN);
+    }
+    // если ячейка не на самой верхней строке
+    if (cell >= N_COLUMN)
+    {
+        neighbours.push_back(cell - N_COLUMN);
+    }
+
+    return neighbours;
 }
-
-//vector<int> neighbours_for_3(int cell) //выявляет для клетки соседей для карты 3х3
-//{
-//	vector <int> neighbours;
-//	if (cell == 0) //для 0
-//	{
-//		neighbours = { cell + 1, cell + N_ROW };
-//	}
-//	else if (cell / N_COLUMN == 0 && cell != N_COLUMN - 1 && cell != 0) // для 1
-//	{
-//		neighbours = { cell - 1, cell + 1, cell + N_ROW };
-//	}
-//	if (cell == N_ROW - 1) //для 2
-//	{
-//		neighbours = { cell - 1, cell + N_ROW };
-//	}
-//	else if (cell == N_COLUMN) // для 3
-//	{
-//		neighbours = { cell - N_ROW, cell + N_ROW, cell + 1 };
-//	}
-//	else if (cell % N_COLUMN == 1 && cell / N_COLUMN == 1 && cell != 0) // для 4 
-//	{
-//		neighbours = { cell + 1, cell + N_ROW, cell - N_ROW, cell - 1 };
-//	}
-//	else if (cell % N_COLUMN == N_COLUMN - 1 && cell != N - 1) //для 5
-//	{
-//		neighbours = { cell - 1, cell + N_ROW, cell - N_ROW };
-//	}
-//	else if (cell % N_COLUMN == 0 && cell / N_COLUMN == N_COLUMN-1) //для 6
-//	{
-//		neighbours = { cell - N_ROW, cell + 1 };
-//	}
-//	else if (cell % N_COLUMN == 1 && cell / N_COLUMN == N_COLUMN - 1) //для 7
-//	{
-//		neighbours = { cell - N_ROW, cell + 1, cell - 1 };
-//	}
-//	else if (cell == N - 1) //для 8
-//	{
-//		neighbours = { cell - 1, cell - N_ROW };
-//	}
-//	return neighbours;
-//}
-
-int find_unvisited(bdd task, int current_cell); //прохожусь по соседям клетки, смотри те, которые еще не проверены, отправляю их на проверку
-
-bdd ask_and_send_percept(vector<vector <int>> Enviroment, int current_cell); // из i-ой клетки достает восприятие (percept)
-
-int check_for_safety(bdd task, int current_cell); //проверяет клетку на безопасность
-
-int Enviroment(bdd task, int current_cell); //сочетает две функции: поиск соседей и проверку на безопасность
-
-void find_path(bdd relation, bdd first_state, bdd* q, bdd* qq, bdd wished_state, vector<int> answer, vector<bdd> visited, bdd &direction);
-
-int move(int cell, string action, bdd &direction);
 
 stack <bdd> plan;
 stack <string> str_plan;
 
-
-//сначала инициализируем статику, потом динамику
 int main()
 {
-	int countvar = 0;           //сквозной счетчик
-	bdd_init(10000000, 10000000);//Выделяем память для 1000000 строк таблицы и КЭШ размером 100000
-	bdd_setvarnum(N_VAR); //задаем количество булевых переменных
+    // Замечание. Сначала инициализируем статику, потом динамику
 
-	cout << " 1 - Agent \n 2 - WUMPUS \n 3 - PIT \n 4 - GOLD \n 22 - Stench \n 33 - Breeze \n ";
+    // Инициализация Buddy
+    int countvar = 0;             // Сквозной счетчик для bdd
+    bdd_init(10000000, 10000000); // Выделяем память для 1000000 строк таблицы и кэш размером 100000
+    bdd_setvarnum(N_VAR);         // Задаем количество булевых переменных
 
-	bdd task = bddtrue; //Решение. Изначально true. Здесь будет находиться база
+    cout << " 1 - Agent\n"
+        << " 2 - Wumpus\n"
+        << " 3 - PIT\n"
+        << " 4 - GOLD\n"
+        << " 22 - Stench\n"
+        << " 33 - Breeze" << endl;
 
-	bdd movements = bddtrue;
+    bdd task = bddtrue; //Решение. Изначально true. Здесь будет находиться база
+    bdd movements = bddtrue;
 
-	//////////////////////////////////// С Т А Т И К А ////////////////////////////////////////////////
+    //////////////////////////////////// С Т А Т И К А ////////////////////////////////////////////////
+    {
+        // для Вампуса
+        for (int i = 0; i < N; i++)
+        {
+            W[i] = bdd_ithvar(countvar);
+            countvar++;
+        }
 
-	//для Вампуса
-	for (int i = 0; i < N; i++)
-	{
-		W[i] = bdd_ithvar(countvar);
-		countvar++;
-	}
+        // для запаха
+        for (int i = 0; i < N; i++)
+        {
+            S[i] = bdd_ithvar(countvar);
+            countvar++;
+        }
 
-	//для запаха
-	for (int i = 0; i < N; i++)
-	{
-		S[i] = bdd_ithvar(countvar);
-		countvar++;
-	}
+        //для ям
+        for (int i = 0; i < N; i++)
+        {
+            P[i] = bdd_ithvar(countvar);
+            countvar++;
+        }
 
-	//для ям
-	for (int i = 0; i < N; i++)
-	{
-		P[i] = bdd_ithvar(countvar);
-		countvar++;
-	}
+        //для ветра
+        for (int i = 0; i < N; i++)
+        {
+            B[i] = bdd_ithvar(countvar);
+            countvar++;
+        }
 
-	//для ветра
-	for (int i = 0; i < N; i++)
-	{
-		B[i] = bdd_ithvar(countvar);
-		countvar++;
-	}
+        // Для золота
+        for (int i = 0; i < N; i++)
+        {
+            G[i] = bdd_ithvar(countvar);
+            countvar++;
+        }
 
-	for (int i = 0; i < N; i++)
-	{
-		G[i] = bdd_ithvar(countvar);
-		countvar++;
-	}
+        //для Stench
 
-	//для Stench
+        Stench = bdd_ithvar(countvar); // переменной запаха
+        countvar++;
 
-	Stench = bdd_ithvar(countvar); // переменной запаха
-	countvar++;
+        //для Breeze
 
-	//для Breeze
+        Breeze = bdd_ithvar(countvar); // переменной ветра
+        countvar++;
 
-	Breeze = bdd_ithvar(countvar); // переменной ветра
-	countvar++;
-
-	//для Scream
-	Scream = bdd_ithvar(countvar);
-	countvar++;
-
+        //для Scream
+        Scream = bdd_ithvar(countvar);
+        countvar++;
+    }
 
 	///////////////////////////////////////////////Д И Н А М И К А//////////////////////////////////////////////////////
 
@@ -784,7 +716,7 @@ int main()
 		task &= !(V_next[i] ^ (V[i] | L[i]));
 	}
 
-	for (int i = 0; i < N; i++) //переменные со стороны среды с учетом восприятия
+	for (int i = 0; i < N; i++) // переменные со стороны среды с учетом восприятия
 	{
 		task &= (L[i] >> (!Breeze ^ B[i]));
 		task &= (L[i] >> (!Stench ^ S[i]));
@@ -792,7 +724,7 @@ int main()
 		task &= ((!OK[i] | !P[i]) & (OK[i] | P[i] | W[i]) & (OK[i] | P[i] | WumpusAlive) & (!OK[i] | !W[i] | !WumpusAlive));
 	}
 
-	//взаимодействие действий и переменных
+	// взаимодействие действий и переменных
 
 	task &= (Shoot >> HaveArrow);
 
@@ -812,79 +744,79 @@ int main()
 	/////////////////////////////////////////// СИМВОЛЬНЫЕ ВЫЧИСЛЕНИЯ ///////////////////////////////////////////////////////////////////
 
 	bdd x[12];
-	bdd q[16]; //нештрихованные
-	bdd qq[16]; //штрихованные
+	bdd q[16];  // нештрихованные
+	bdd qq[16]; // штрихованные
 
 	for (int i = 0; i < 12; i++)
 	{
 		x[i] = bdd_ithvar(i);
 	}
 
-	q[0] = !x[0] & !x[1] & !x[2] & !x[3]; //0000
-	q[1] = !x[0] & !x[1] & !x[2] & x[3]; //0001
-	q[2] = !x[0] & !x[1] & x[2] & !x[3]; //0010
-	q[3] = !x[0] & !x[1] & x[2] & x[3]; //0011
+    q[0] = !x[0] & !x[1] & !x[2] & !x[3]; // 0000
+    q[1] = !x[0] & !x[1] & !x[2] & x[3];  // 0001
+    q[2] = !x[0] & !x[1] & x[2] & !x[3];  // 0010
+    q[3] = !x[0] & !x[1] & x[2] & x[3];   // 0011
 
-	q[4] = !x[0] & x[1] & !x[2] & !x[3];//0100
-	q[5] = !x[0] & x[1] & !x[2] & x[3]; //0101
-	q[6] = !x[0] & x[1] & x[2] & !x[3]; //0110
-	q[7] = !x[0] & x[1] & x[2] & x[3]; //0111
+    q[4] = !x[0] & x[1] & !x[2] & !x[3]; // 0100
+    q[5] = !x[0] & x[1] & !x[2] & x[3];  // 0101
+    q[6] = !x[0] & x[1] & x[2] & !x[3];  // 0110
+    q[7] = !x[0] & x[1] & x[2] & x[3];   // 0111
 
-	q[8] = x[0] & !x[1] & !x[2] & !x[3]; //1000
-	q[9] = x[0] & !x[1] & !x[2] & x[3]; //1001
-	q[10] = x[0] & !x[1] & x[2] & !x[3];//1010
-	q[11] = x[0] & !x[1] & x[2] & x[3];//1011
+    q[8] = x[0] & !x[1] & !x[2] & !x[3]; // 1000
+    q[9] = x[0] & !x[1] & !x[2] & x[3];  // 1001
+    q[10] = x[0] & !x[1] & x[2] & !x[3]; // 1010
+    q[11] = x[0] & !x[1] & x[2] & x[3];  // 1011
 
-	q[12] = x[0] & x[1] & !x[2] & !x[3];//1100
-	q[13] = x[0] & x[1] & !x[2] & x[3];//1101
-	q[14] = x[0] & x[1] & x[2] & !x[3];//1110
-	q[15] = x[0] & x[1] & x[2] & x[3];//1111
+    q[12] = x[0] & x[1] & !x[2] & !x[3]; // 1100
+    q[13] = x[0] & x[1] & !x[2] & x[3];  // 1101
+    q[14] = x[0] & x[1] & x[2] & !x[3];  // 1110
+    q[15] = x[0] & x[1] & x[2] & x[3];   // 1111
 
 
-	qq[0] = !x[4] & !x[5] & !x[6] & !x[7];
-	qq[1] = !x[4] & !x[5] & !x[6] & x[7]; //0001
-	qq[2] = !x[4] & !x[5] & x[6] & !x[7]; //0010
-	qq[3] = !x[4] & !x[5] & x[6] & x[7]; //0011
+    qq[0] = !x[4] & !x[5] & !x[6] & !x[7]; // 0000
+    qq[1] = !x[4] & !x[5] & !x[6] & x[7];  // 0001
+    qq[2] = !x[4] & !x[5] & x[6] & !x[7];  // 0010
+    qq[3] = !x[4] & !x[5] & x[6] & x[7];   // 0011
 
-	qq[4] = !x[4] & x[5] & !x[6] & !x[7];//0100
-	qq[5] = !x[4] & x[5] & !x[6] & x[7]; //0101
-	qq[6] = !x[4] & x[5] & x[6] & !x[7]; //0110
-	qq[7] = !x[4] & x[5] & x[6] & x[7]; //0111
+    qq[4] = !x[4] & x[5] & !x[6] & !x[7];  // 0100
+    qq[5] = !x[4] & x[5] & !x[6] & x[7];   // 0101
+    qq[6] = !x[4] & x[5] & x[6] & !x[7];   // 0110
+    qq[7] = !x[4] & x[5] & x[6] & x[7];    // 0111
 
-	qq[8] = x[4] & !x[5] & !x[6] & !x[7]; //1000
-	qq[9] = x[4] & !x[5] & !x[6] & x[7]; //1001
-	qq[10] = x[4] & !x[5] & x[6] & !x[7];//1010
-	qq[11] = x[4] & !x[5] & x[6] & x[7];//1011
+    qq[8] = x[4] & !x[5] & !x[6] & !x[7]; // 1000
+    qq[9] = x[4] & !x[5] & !x[6] & x[7];  // 1001
+    qq[10] = x[4] & !x[5] & x[6] & !x[7]; // 1010
+    qq[11] = x[4] & !x[5] & x[6] & x[7];  // 1011
 
-	qq[12] = x[4] & x[5] & !x[6] & !x[7];//1100
-	qq[13] = x[4] & x[5] & !x[6] & x[7];//1101
-	qq[14] = x[4] & x[5] & x[6] & !x[7];//1110
-	qq[15] = x[4] & x[5] & x[6] & x[7];//1111
+    qq[12] = x[4] & x[5] & !x[6] & !x[7]; // 1100
+    qq[13] = x[4] & x[5] & !x[6] & x[7];  // 1101
+    qq[14] = x[4] & x[5] & x[6] & !x[7];  // 1110
+    qq[15] = x[4] & x[5] & x[6] & x[7];   // 1111
 
-	n = !x[8] & !x[9]; //00
-	s = !x[8] & x[9]; //01
-	e = x[8] & !x[9]; //10
-	w = x[8] & x[9]; //11
+    n = !x[8] & !x[9]; // 00
+    s = !x[8] & x[9];  // 01
+    e = x[8] & !x[9];  // 10
+    w = x[8] & x[9];   // 11
 
-	bdd R = q[0] & e & qq[1] | q[0] & s & qq[4] |
-		q[1] & w & qq[0] | q[1] & s & qq[5] | q[1] & e & qq[2] |
-		q[2] & w & qq[1] | q[2] & s & qq[6] | q[2] & e & qq[3] |
-		q[3] & w & qq[2] | q[3] & s & qq[7] |
+    bdd R = q[0] & e & qq[1] | q[0] & s & qq[4] |
+        q[1] & w & qq[0] | q[1] & s & qq[5] | q[1] & e & qq[2] |
+        q[2] & w & qq[1] | q[2] & s & qq[6] | q[2] & e & qq[3] |
+        q[3] & w & qq[2] | q[3] & s & qq[7] |
 
-		q[4] & e & qq[5] | q[4] & s & qq[8] | q[4] & n & qq[0] |
-		q[5] & w & qq[4] | q[5] & s & qq[9] | q[5] & n & qq[1] | q[5] & e & qq[6] |
-		q[6] & e & qq[7] | q[6] & n & qq[2] | q[6] & w & qq[5] | q[6] & s & qq[10] |
-		q[7] & s & qq[11] | q[7] & w & qq[6] | q[7] & n & qq[3] |
+        q[4] & e & qq[5] | q[4] & s & qq[8] | q[4] & n & qq[0] |
+        q[5] & w & qq[4] | q[5] & s & qq[9] | q[5] & n & qq[1] | q[5] & e & qq[6] |
+        q[6] & e & qq[7] | q[6] & n & qq[2] | q[6] & w & qq[5] | q[6] & s & qq[10] |
+        q[7] & s & qq[11] | q[7] & w & qq[6] | q[7] & n & qq[3] |
 
-		q[8] & e & qq[9] | q[8] & n & qq[4] | q[8] & s & qq[12] |
-		q[9] & e & qq[10] | q[9] & w & qq[8] | q[9] & n & qq[5] | q[9] & s & qq[13] |
-		q[10] & e & qq[11] | q[10] & w & qq[9] | q[10] & n & qq[6] | q[10] & s & qq[14] |
-		q[11] & w & qq[10] | q[11] & s & qq[15] | q[11] & n & qq[7] |
+        q[8] & e & qq[9] | q[8] & n & qq[4] | q[8] & s & qq[12] |
+        q[9] & e & qq[10] | q[9] & w & qq[8] | q[9] & n & qq[5] | q[9] & s & qq[13] |
+        q[10] & e & qq[11] | q[10] & w & qq[9] | q[10] & n & qq[6] | q[10] & s & qq[14] |
+        q[11] & w & qq[10] | q[11] & s & qq[15] | q[11] & n & qq[7] |
 
-		q[12] & e & qq[13] | q[12] & n & qq[8] |
-		q[13] & e & qq[14] | q[13] & w & qq[12] | q[13] & n & qq[9] |
-		q[14] & e & qq[15] | q[14] & w & qq[13] | q[14] & n & qq[10] |
-		q[15] & w & qq[14] | q[15] & n & qq[11];
+        q[12] & e & qq[13] | q[12] & n & qq[8] |
+        q[13] & e & qq[14] | q[13] & w & qq[12] | q[13] & n & qq[9] |
+        q[14] & e & qq[15] | q[14] & w & qq[13] | q[14] & n & qq[10] |
+        q[15] & w & qq[14] | q[15] & n & qq[11];
 
 	// начинаем всегда с 0 клетки
 	int current_cell = 0;
@@ -895,8 +827,8 @@ int main()
 						false, false, false, false,
 						false, false, false, false,
 						false, false, false, false };
-	// Вывожу карту
 
+    // Вывожу карту
 	bool gold_flag = false;
 	int k1 = 0;
 	for (unsigned p = 0; p < real_cave2.size(); p++)
@@ -912,6 +844,7 @@ int main()
 		if (k1 % 4 == 0)
 			cout << "\n";
 	}
+
 	bdd relation;
 	vector <bdd> visited = { qq[current_cell] };
 	vector <int> answer;
