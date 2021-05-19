@@ -10,6 +10,7 @@
 #include <map>
 #include <stack>
 #include <chrono>
+#include <iomanip>
 
 #include "WorldMap.h"
 
@@ -25,7 +26,7 @@ ofstream out;
 #define N_FUNCTIONS_IN_FIELD (4 + 3*4) // до percept здесь было 4+3*2
 #define N_VAR 207
 
-vector<int> neighbours(int cell); // Определение соседей относительно клетки cell
+vector<int> neighbourNodes(int cell); // Определение соседей относительно клетки cell
 int find_unvisited(bdd task, int current_cell); //прохожусь по соседям клетки, смотри те, которые еще не проверены, отправляю их на проверку
 bdd ask_and_send_percept(vector<vector <int>> Enviroment, int current_cell); // из i-ой клетки достает восприятие (percept)
 int check_for_safety(bdd task, int current_cell); //проверяет клетку на безопасность
@@ -117,20 +118,13 @@ bdd Shoot_next;
 
 #pragma endregion 
 
-//массив проверенных клеток
-bool checked_cells[N] = { true, false, false, false,
-                          false, false, false, false,
-                          false, false, false, false,
-                          false, false, false, false };
+vector<bool> checked_cells;  // массив проверенных клеток
+//vector<bool> not_safe_cells; // массив небезопасных клеток
+//vector<bool> unknown_cells;  // пока не можем говорить, безопасные или нет
+vector<bool> safe_cells;     // массив безопасных клеток
 
-bool not_safe_cells[N]; //массив небезопасных клеток
-
-bool unknown_cells[N]; //пока не можем говорить, безопасные или нет
-
-bool safe_cells[N] = { true, false, false, false,
-                       false, false, false, false,
-                       false, false, false, false, 
-                       false, false, false, false}; //массив безопасных клеток
+bool not_safe_cells[N]; //массив небезопасных клеток (он нужен???)
+bool unknown_cells[N]; //пока не можем говорить, безопасные или нет (он нужен???)
 
 stack <int> cells[N]; //стек для хранения предыдущей клетки
 
@@ -150,12 +144,21 @@ int main()
     bdd_init(10000000, 10000000); // Выделяем память для 1000000 строк таблицы и кэш размером 100000
     bdd_setvarnum(N_VAR);         // Задаем количество булевых переменных
 
-    cout << " 1 - Agent\n"
-         << " 2 - Wumpus\n"
-         << " 3 - PIT\n"
-         << " 4 - GOLD\n"
-         << " 22 - Stench\n"
-         << " 33 - Breeze" << endl;
+    // Инициализация массивов
+    checked_cells[0] = true;
+    safe_cells[0] = true;
+    for (int i = 1; i < N; ++i)
+    {
+        checked_cells[i] = false;
+        safe_cells[i] = false;
+    }
+
+    cout << setw(3) << static_cast<int>(Node::AGENT)  << " - Agent\n"
+         << setw(3) << static_cast<int>(Node::WUMPUS) << " - Wumpus\n"
+         << setw(3) << static_cast<int>(Node::PIT)    << " - Pit\n"
+         << setw(3) << static_cast<int>(Node::GOLD)   << " - Gold\n"
+         << setw(3) << static_cast<int>(Node::STENCH) << " - Stench\n"
+         << setw(3) << static_cast<int>(Node::BREEZE) << " - Breeze" << endl;
 
     bdd task = bddtrue; //Решение. Изначально true. Здесь будет находиться база
     bdd movements = bddtrue;
@@ -219,7 +222,7 @@ int main()
         countvar++;
     }
 
-    ///////////////////////////////////////////////Д И Н А М И К А//////////////////////////////////////////////////////
+    // Динамика
     {
         // для нахождения агента в клетке
         for (int i = 0; i < N; i++)
@@ -395,28 +398,7 @@ int main()
     // Формируем базу знаний не зависящую от времени
     for (int i = 0; i < N; i++)
     {
-        vector<int> pos;
-
-        // если ячейка не в крайнем левом столбце
-        if (i % N_COLUMN != 0)
-        {
-            pos.push_back(i - 1);
-        }
-        // если ячейка не в крайнем правом столбце
-        if ((i + 1) % N_COLUMN != 0)
-        {
-            pos.push_back(i + 1);
-        }
-        // если ячейка не на самой нижней строке
-        if (i < N_COLUMN * (N_ROW - 1))
-        {
-            pos.push_back(i + N_COLUMN);
-        }
-        // если ячейка не на самой верхней строке
-        if (i >= N_COLUMN)
-        {
-            pos.push_back(i - N_COLUMN);
-        }
+        vector<int> neigbours = neighbourNodes(i);
 
         // формируем tempB, tempP, tempS.
         // отдельно формируем tempW
@@ -425,21 +407,21 @@ int main()
         bdd tempB = bddtrue;
         bdd tempW = bddfalse;
         bdd tempS = bddtrue;
-        for (int i = 0; i < pos.size(); ++i)
+        for (int i = 0; i < neigbours.size(); ++i)
         {
-            tempP |= P[pos[i]];
-            tempB &= B[pos[i]];
-            tempS &= S[pos[i]];
+            tempP |= P[neigbours[i]];
+            tempB &= B[neigbours[i]];
+            tempS &= S[neigbours[i]];
             bdd temp = bddtrue;
-            for (int j = 0; j < pos.size(); ++j)
+            for (int j = 0; j < neigbours.size(); ++j)
             {
                 if (i == j)
                 {
-                    temp &= W[pos[j]];
+                    temp &= W[neigbours[j]];
                 }
                 else
                 {
-                    temp &= !W[pos[j]];
+                    temp &= !W[neigbours[j]];
                 }
             }
             tempW |= temp;
@@ -451,200 +433,181 @@ int main()
                 (!W[i] ^ tempS);
     }
 
-    /////////////////////////////////////////////////////////// ДВЕ ФУНКЦИИ ПРО ВАМПУСА //////////////////////////////////////// 
+    // Два правила про Вампуса
+    {
+        // Правило, что Вампус хотя бы один
+        bdd temp_w = bddfalse;
+        for (int i = 0; i < N; i++)
+        {
+            temp_w |= W[i];
+        }
+        task &= temp_w;
 
-    bdd temp_w = bddfalse;
-	for (int i = 0; i < N; i++)
-	{
-		temp_w |= W[i];
-	}
-	task &= temp_w;
+        // Правило, что на поле не более одного Вампуса
+        for (int i = 0; i < N; i++)
+        {
+            for (int j = 0; j < N; j++)
+            {
+                if (j != i)
+                {
+                    task &= (W[i] >> !W[j]);
+                }
+            }
+        }
+    }
 
+    task &= (!HaveArrow_next ^ (HaveArrow & !Shoot));
+    task &= (!WumpusAlive_next ^ (WumpusAlive & !Scream));
 
-	for (int i = 0; i < N; i++) //то что не более одного Вампуса
-	{
-		for (int j = 0; j < N; j++)
-		{
-			if (j != i)
-			{
-				task &= (W[i] >> !W[j]);
+    //направление агента
+    task &= (!North_next ^ ((TurnRight & West) | (TurnLeft & East) | (North & !TurnLeft & !TurnRight)));
+    task &= (!South_next ^ ((TurnRight & East) | (TurnLeft & West) | (South & !TurnLeft & !TurnRight)));
+    task &= (!East_next ^ ((TurnRight & North) | (TurnLeft & South) | (East & !TurnLeft & !TurnRight)));
+    task &= (!West_next ^ ((TurnRight & South) | (TurnLeft & North) | (West & !TurnLeft & !TurnRight)));
 
-			}
-		}
-	}
+    task &= (!HaveGold_next ^ (Grab & HaveGold));
+    task &= (!ClimbedOut_next ^ (Climb & ClimbedOut));
 
-	task &= (!HaveArrow_next ^ (HaveArrow & !Shoot));
-	task &= (!WumpusAlive_next ^ (WumpusAlive & !Scream));
+    // для изменения местоположения агента, пока не трогала (???)
+    for (int i = 0; i < N; i++)
+    {
+        bdd temp = L[i] & !Forward;
 
-	//направление агента
-	task &= (!North_next ^ ((TurnRight & West) | (TurnLeft & East) | (North & !TurnLeft & !TurnRight)));
-	task &= (!South_next ^ ((TurnRight & East) | (TurnLeft & West) | (South & !TurnLeft & !TurnRight)));
-	task &= (!East_next ^ ((TurnRight & North) | (TurnLeft & South) | (East & !TurnLeft & !TurnRight)));
-	task &= (!West_next ^ ((TurnRight & South) | (TurnLeft & North) | (West & !TurnLeft & !TurnRight)));
+        // если ячейка не в крайнем левом столбце
+        if (i % N_COLUMN != 0)
+        {
+            temp |= L[i - 1] & Forward & East;
+        }
+        // если ячейка не в крайнем правом столбце
+        if ((i + 1) % N_COLUMN != 0)
+        {
+            temp |= L[i + 1] & Forward & West;
+        }
+        // если ячейка не на самой нижней строке
+        if (i < N_COLUMN * (N_ROW - 1))
+        {
+            temp |= L[i + N_COLUMN] & Forward & North;
+        }
+        // если ячейка не на самой верхней строке
+        if (i >= N_COLUMN)
+        {
+            temp |= L[i - N_COLUMN] & Forward & South;
+        }
 
-	task &= (!HaveGold_next ^ (Grab & HaveGold));
-	task &= (!ClimbedOut_next ^ (Climb & ClimbedOut));
+        task &= !L_next[i] ^ temp;
+    }
 
-	// для изменения местоположения агента, пока не трогала
-	for (int i = 0; i < N; i++)
-	{
-		if (i % N_COLUMN != 0 && i % N_COLUMN != N_COLUMN - 1 && i / N_COLUMN != 0 && i / N_COLUMN != N_COLUMN - 1) //для тех, что в серединке (5,6,9,10)
-		{
-			task &= !L_next[i] ^ ((L[i] & !Forward) | (L[i - N_COLUMN] & Forward & South) | (L[i + 1] & Forward & West) | (L[i + N_COLUMN] & Forward & North) | (L[i - 1] & Forward & East));
-		}
-		else if (i % N_COLUMN == 0 && i != N - N_COLUMN && i != 0) //для 4 и 8
-		{
-			task &= !L_next[i] ^ ((L[i] & !Forward) | (L[i - N_COLUMN] & Forward & South) | (L[i + 1] & Forward & West) | (L[i + N_COLUMN] & Forward & North));
-		}
-		else if (i / N_ROW == N_ROW - 1 && i != N - N_ROW && i != N - 1) //для 13 и 14
-		{
-			task &= !L_next[i] ^ ((L[i] & !Forward) | (L[i - N_COLUMN] & Forward & South) | (L[i - 1] & Forward & East) | (L[i + 1] & Forward & West));
-		}
-		else if (i % N_COLUMN == N_COLUMN - 1 && i == N - 1) //для 15
-		{
-			task &= !L_next[i] ^ ((L[i] & !Forward) | (L[i - N_COLUMN] & Forward & South) | (L[i - 1] & Forward & East));
-		}
-		else if (i % N_COLUMN == N_COLUMN - 1 && i != N - 1) //для 7 и 11
-		{
-			task &= !L_next[i] ^ ((L[i] & !Forward) | (L[i - N_COLUMN] & Forward & South) | (L[i - 1] & Forward & East) | (L[i + N_COLUMN] & Forward & North));
-		}
-		else if (i / N_COLUMN == 0 && i == N_COLUMN - 1) //для 3
-		{
-			task &= !L_next[i] ^ ((L[i] & !Forward) | (L[i + N_COLUMN] & Forward & North) | (L[i - 1] & Forward & East));
-		}
-		else if (i / N_COLUMN == 0 && i != N_COLUMN - 1 && i != 0) //для 1 и 2
-		{
-			task &= !L_next[i] ^ ((L[i] & !Forward) | (L[i - N_COLUMN] & Forward & South) | (L[i - 1] & Forward & East) | (L[i + 1] & Forward & West));
-		}
-		else if (i % N_COLUMN == 0 && i == N - N_COLUMN) //для 12
-		{
-			task &= !L_next[i] ^ ((L[i] & !Forward) | (L[i - N_COLUMN] & Forward & South) | (L[i + 1] & Forward & West));
-		}
-		if (i == 0) // для 0
-		{
-			task &= !L_next[i] ^ ((L[i] & !Forward) | (L[i + N_COLUMN] & Forward & North) | (L[i + 1] & Forward & West));
-		}
-	}
+    // ???
+    for (int i = 0; i < N; i++)
+    {
+        task &= !(V_next[i] ^ (V[i] | L[i]));
+    }
 
-	for (int i = 0; i < N; i++)
-	{
-		task &= !(V_next[i] ^ (V[i] | L[i]));
-	}
+    // переменные со стороны среды с учетом восприятия
+    for (int i = 0; i < N; i++)
+    {
+        task &= (L[i] >> (!Breeze ^ B[i]));
+        task &= (L[i] >> (!Stench ^ S[i]));
+        task &= L[i] >> V[i];
+        task &= ((!OK[i] | !P[i]) & (OK[i] | P[i] | W[i]) & (OK[i] | P[i] | WumpusAlive) & (!OK[i] | !W[i] | !WumpusAlive));
+    }
 
-	for (int i = 0; i < N; i++) // переменные со стороны среды с учетом восприятия
-	{
-		task &= (L[i] >> (!Breeze ^ B[i]));
-		task &= (L[i] >> (!Stench ^ S[i]));
-		task &= L[i] >> V[i];
-		task &= ((!OK[i] | !P[i]) & (OK[i] | P[i] | W[i]) & (OK[i] | P[i] | WumpusAlive) & (!OK[i] | !W[i] | !WumpusAlive));
-	}
+    // взаимодействие действий и переменных
 
-	// взаимодействие действий и переменных
+    task &= (Shoot >> HaveArrow);
 
-	task &= (Shoot >> HaveArrow);
+    task &= (Forward >> (!Shoot & !TurnLeft & !TurnRight & !Grab & !Climb));
+    task &= (Shoot >> (!Forward & !TurnLeft & !TurnRight & !Grab & !Climb));
+    task &= (TurnLeft >> (!Shoot & !Forward & !TurnRight & !Grab & !Climb));
+    task &= (TurnRight >> (!Shoot & !TurnLeft & !Forward & !Grab & !Climb));
+    task &= (Grab >> (!Shoot & !TurnLeft & !Forward & !TurnRight & !Climb));
+    task &= (Climb >> (!Shoot & !TurnLeft & !Forward & !Grab & !TurnRight));
 
-	task &= (Forward >> (!Shoot & !TurnLeft & !TurnRight & !Grab & !Climb));
-	task &= (Shoot >> (!Forward & !TurnLeft & !TurnRight & !Grab & !Climb));
-	task &= (TurnLeft >> (!Shoot & !Forward & !TurnRight & !Grab & !Climb));
-	task &= (TurnRight >> (!Shoot & !TurnLeft & !Forward & !Grab & !Climb));
-	task &= (Grab >> (!Shoot & !TurnLeft & !Forward & !TurnRight & !Climb));
-	task &= (Climb >> (!Shoot & !TurnLeft & !Forward & !Grab & !TurnRight));
+    task &= (East >> (!West & !South & !North));
+    task &= (West >> (!East & !South & !North));
+    task &= (South >> (!West & !East & !North));
+    task &= (North >> (!West & !East & !South));
 
+    // СИМВОЛЬНЫЕ ВЫЧИСЛЕНИЯ
 
-	task &= (East >> (!West & !South & !North));
-	task &= (West >> (!East & !South & !North));
-	task &= (South >> (!West & !East & !North));
-	task &= (North >> (!West & !East & !South));
+    const int xSize = 12;
+    bdd x[xSize];  // ???
+    bdd q[16];  // нештрихованные
+    bdd qq[16]; // штрихованные
+    bdd qq1[16]; // штрихованные
 
-	/////////////////////////////////////////// СИМВОЛЬНЫЕ ВЫЧИСЛЕНИЯ ///////////////////////////////////////////////////////////////////
+    // ???
+    for (int i = 0; i < xSize; i++)
+    {
+        x[i] = bdd_ithvar(i);
+    }
 
-	bdd x[12];
-	bdd q[16];  // нештрихованные
-	bdd qq[16]; // штрихованные
-
-	for (int i = 0; i < 12; i++)
-	{
-		x[i] = bdd_ithvar(i);
-	}
-
-    q[0] = !x[0] & !x[1] & !x[2] & !x[3]; // 0000
-    q[1] = !x[0] & !x[1] & !x[2] & x[3];  // 0001
-    q[2] = !x[0] & !x[1] & x[2] & !x[3];  // 0010
-    q[3] = !x[0] & !x[1] & x[2] & x[3];   // 0011
-
-    q[4] = !x[0] & x[1] & !x[2] & !x[3]; // 0100
-    q[5] = !x[0] & x[1] & !x[2] & x[3];  // 0101
-    q[6] = !x[0] & x[1] & x[2] & !x[3];  // 0110
-    q[7] = !x[0] & x[1] & x[2] & x[3];   // 0111
-
-    q[8] = x[0] & !x[1] & !x[2] & !x[3]; // 1000
-    q[9] = x[0] & !x[1] & !x[2] & x[3];  // 1001
-    q[10] = x[0] & !x[1] & x[2] & !x[3]; // 1010
-    q[11] = x[0] & !x[1] & x[2] & x[3];  // 1011
-
-    q[12] = x[0] & x[1] & !x[2] & !x[3]; // 1100
-    q[13] = x[0] & x[1] & !x[2] & x[3];  // 1101
-    q[14] = x[0] & x[1] & x[2] & !x[3];  // 1110
-    q[15] = x[0] & x[1] & x[2] & x[3];   // 1111
-
-
-    qq[0] = !x[4] & !x[5] & !x[6] & !x[7]; // 0000
-    qq[1] = !x[4] & !x[5] & !x[6] & x[7];  // 0001
-    qq[2] = !x[4] & !x[5] & x[6] & !x[7];  // 0010
-    qq[3] = !x[4] & !x[5] & x[6] & x[7];   // 0011
-
-    qq[4] = !x[4] & x[5] & !x[6] & !x[7];  // 0100
-    qq[5] = !x[4] & x[5] & !x[6] & x[7];   // 0101
-    qq[6] = !x[4] & x[5] & x[6] & !x[7];   // 0110
-    qq[7] = !x[4] & x[5] & x[6] & x[7];    // 0111
-
-    qq[8] = x[4] & !x[5] & !x[6] & !x[7]; // 1000
-    qq[9] = x[4] & !x[5] & !x[6] & x[7];  // 1001
-    qq[10] = x[4] & !x[5] & x[6] & !x[7]; // 1010
-    qq[11] = x[4] & !x[5] & x[6] & x[7];  // 1011
-
-    qq[12] = x[4] & x[5] & !x[6] & !x[7]; // 1100
-    qq[13] = x[4] & x[5] & !x[6] & x[7];  // 1101
-    qq[14] = x[4] & x[5] & x[6] & !x[7];  // 1110
-    qq[15] = x[4] & x[5] & x[6] & x[7];   // 1111
+    for (int i = 0; i < N; ++i)
+    {
+        q[i] = bddtrue;
+        qq1[i] = bddtrue;
+        for (int j = 0; j < N_LOG; ++j)
+        {
+            if (((i >> (N_LOG - 1 - j)) & 1) == 1) // don't ask me why
+            {
+                q[i] &= x[j];
+                qq1[i] &= x[j + N_LOG];
+            }
+            else
+            {
+                q[i] &= !x[j];
+                qq1[i] &= !x[j + N_LOG];
+            }
+        }
+    }
 
     n = !x[8] & !x[9]; // 00
     s = !x[8] & x[9];  // 01
     e = x[8] & !x[9];  // 10
     w = x[8] & x[9];   // 11
 
-    bdd R = q[0] & e & qq[1] | q[0] & s & qq[4] |
-            q[1] & w & qq[0] | q[1] & s & qq[5] | q[1] & e & qq[2] |
-            q[2] & w & qq[1] | q[2] & s & qq[6] | q[2] & e & qq[3] |
-            q[3] & w & qq[2] | q[3] & s & qq[7] |
+    // Описание переходов на графе для символьных вычислений
+    bdd R = bddfalse;
+    for (int i = 0; i < N; ++i)
+    {
+        // если ячейка не в крайнем левом столбце
+        if (i % N_COLUMN != 0)
+        {
+            R |= q[i]     | e | q[i - 1];
+            R |= q[i - 1] | w | q[i];
+        }
+        // если ячейка не в крайнем правом столбце
+        if ((i + 1) % N_COLUMN != 0)
+        {
+            R |= q[i]     | w | q[i + 1];
+            R |= q[i + 1] | e | q[i];
+        }
+        // если ячейка не на самой нижней строке
+        if (i < N_COLUMN * (N_ROW - 1))
+        {
+            R |= q[i]            | s | q[i + N_COLUMN];
+            R |= q[i + N_COLUMN] | n | q[i];
+        }
+        // если ячейка не на самой верхней строке
+        if (i >= N_COLUMN)
+        {
+            R |= q[i]            | n | q[i - N_COLUMN];
+            R |= q[i - N_COLUMN] | s | q[i];
+        }
+    }
 
-            q[4] & e & qq[5] | q[4] & s & qq[8] | q[4] & n & qq[0] |
-            q[5] & w & qq[4] | q[5] & s & qq[9] | q[5] & n & qq[1] | q[5] & e & qq[6] |
-            q[6] & e & qq[7] | q[6] & n & qq[2] | q[6] & w & qq[5] | q[6] & s & qq[10] |
-            q[7] & s & qq[11] | q[7] & w & qq[6] | q[7] & n & qq[3] |
+    // начинаем всегда с 0 клетки
+    int current_cell = 0;
+    int cell_to_go = 0;
 
-            q[8] & e & qq[9] | q[8] & n & qq[4] | q[8] & s & qq[12] |
-            q[9] & e & qq[10] | q[9] & w & qq[8] | q[9] & n & qq[5] | q[9] & s & qq[13] |
-            q[10] & e & qq[11] | q[10] & w & qq[9] | q[10] & n & qq[6] | q[10] & s & qq[14] |
-            q[11] & w & qq[10] | q[11] & s & qq[15] | q[11] & n & qq[7] |
-
-            q[12] & e & qq[13] | q[12] & n & qq[8] |
-            q[13] & e & qq[14] | q[13] & w & qq[12] | q[13] & n & qq[9] |
-            q[14] & e & qq[15] | q[14] & w & qq[13] | q[14] & n & qq[10] |
-            q[15] & w & qq[14] | q[15] & n & qq[11];
-
-	// начинаем всегда с 0 клетки
-	int current_cell = 0;
-	int cell_to_go = 0;
-
-	vector<int> cells_visited_by_agent = { 0 };
-	bool reverse_cells[N] = { false, false, false, false,
-						false, false, false, false,
-						false, false, false, false,
-						false, false, false, false };
+    vector<int> cells_visited_by_agent = { 0 };
+    vector<bool> reverse_cells;
+    for (int i = 0; i < N; ++i)
+    {
+        reverse_cells[i] = false;
+    }
 
     // Вывожу карту
-	bool gold_flag = false;
 	int k1 = 0;
 	for (unsigned p = 0; p < real_cave2.size(); p++)
 	{
@@ -667,10 +630,12 @@ int main()
 	stack <string> new_plan;
 	stack <int> previous_cell;
 
-	auto start = std::chrono::high_resolution_clock::now();
+    // Засекаем время старта алгоритма
+    auto start = std::chrono::high_resolution_clock::now();
 
-	cout << "Current cell is 0" << endl;
-	do { 
+    cout << "Current cell is 0" << endl;
+    bool gold_flag = false;
+    do { 
 
 		bdd percept = ask_and_send_percept(real_cave2, current_cell);
 		if ((percept &= !G[current_cell]) == bddfalse)
@@ -687,7 +652,7 @@ int main()
 				previous_cell.push(current_cell);
 				reverse_cells[current_cell] = true;
 				new_relation = R & q[current_cell];
-				vector<int> neighb = neighbours(current_cell);
+				vector<int> neighb = neighbourNodes(current_cell);
 				for (int i : neighb)
 				{
 					count++;
@@ -766,17 +731,19 @@ int main()
 
 	} while (gold_flag != true);
 
-	auto diff = std::chrono::high_resolution_clock::now() - start; // разница 
+    // Время работы алгоритма
+	auto diff = std::chrono::high_resolution_clock::now() - start; 
 	auto nsec = std::chrono::duration_cast<std::chrono::nanoseconds>(diff);
 	cout << "It took: " << nsec.count() << " nanoseconds" << endl;
 
-	bdd_done();
-	system("pause");
+    // Завершение
+    bdd_done();
+    system("pause");
     return 0;
 }
 
 // Определение соседей относительно клетки cell
-vector<int> neighbours(int cell)
+vector<int> neighbourNodes(int cell)
 {
     vector <int> neighbours;
 
@@ -835,7 +802,7 @@ int check_for_safety(bdd task, int current_cell) //проверка клетки на безопаснос
 
 int find_unvisited(bdd task, int current_cell) //прохожусь по соседям клетки, смотри те, которые еще не проверены, отправляю их на проверку
 {
-	vector <int> neighbours_of_cell = neighbours(current_cell);
+	vector <int> neighbours_of_cell = neighbourNodes(current_cell);
 
 	for (int i = 0; i < neighbours_of_cell.size(); i++)
 	{
@@ -879,7 +846,7 @@ int Enviroment(bdd task, int current_cell)
 
 	if (cell_to_check == current_cell)
 	{
-		vector<int> neighb = neighbours(current_cell);
+		vector<int> neighb = neighbourNodes(current_cell);
 		for (int i = 0; i < neighb.size(); i++)
 			if (checked_cells[neighb[i]] == true)
 			{
