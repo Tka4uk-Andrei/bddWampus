@@ -13,8 +13,6 @@
 
 #include "WorldMap.h"
 
-#define DIRECTIONS
-
 using namespace std;
 
 ofstream out;
@@ -27,19 +25,18 @@ ofstream out;
 #define N_FUNCTIONS_IN_FIELD (4 + 3*4) // до percept здесь было 4+3*2
 #define N_VAR 207
 
+vector<int> neighbours(int cell); // Определение соседей относительно клетки cell
 int find_unvisited(bdd task, int current_cell); //прохожусь по соседям клетки, смотри те, которые еще не проверены, отправляю их на проверку
 bdd ask_and_send_percept(vector<vector <int>> Enviroment, int current_cell); // из i-ой клетки достает восприятие (percept)
 int check_for_safety(bdd task, int current_cell); //проверяет клетку на безопасность
 int Enviroment(bdd task, int current_cell); //сочетает две функции: поиск соседей и проверку на безопасность
 void find_path(bdd relation, bdd first_state, bdd* q, bdd* qq, bdd wished_state, vector<int> answer, vector<bdd> visited, bdd& direction);
 int move(int cell, string action, bdd& direction);
-void fun(char* varset, int size); //функция, используемая для вывода решений
-void print(); // Печать в файл
 
 //переменные восприятия среды
-bdd Stench;
-bdd Breeze;
-bdd Scream;
+bdd Stench; // ощущение агентом 
+bdd Breeze; // ощущение агентом ветерка
+bdd Scream; // ???
 
 // переменные состояния среды, СТАТИЧНЫЕ, ОТ ВРЕМЕНИ НЕ ЗАВИСЯТ
 bdd B[N]; //ветер
@@ -54,7 +51,9 @@ bdd e; // Запад
 bdd s; // Юг
 bdd w; // Восток
 
-//переменные состояния среды, ЗАВИСЯТ ОТ ВРЕМЕНИ
+//переменные состояния среды, ЗАВИСЯЩИЕ ОТ ВРЕМЕНИ
+#pragma region Time-dependent environment state variables
+
 bdd HaveArrow;//иметь стрелу
 bdd HaveArrow_next; //иметь стрелу в следующем состоянии
 
@@ -67,29 +66,37 @@ bdd HaveGold_next;
 bdd ClimbedOut; //вылезти из пещеры
 bdd ClimbedOut_next;
 
-//переменные положения агента, ЗАВИСЯТ ОТ ВРЕМЕНИ
-bdd L[N]; //нахождение агента
-bdd L_next[N];
+#pragma endregion
 
-bdd North; //смотреть на север
+//переменные положения агента, ЗАВИСЯЩИЕ ОТ ВРЕМЕНИ
+#pragma region Time-dependent agent position variables
+
+bdd L[N];      // текущее положение агента
+bdd L_next[N]; // положение агента в следующий момент времени
+
+bdd North;      // агент смотрит на север
 bdd North_next;
 
-bdd West;
+bdd West;       // агент смотрит на запад
 bdd West_next;
 
-bdd South;
+bdd South;      // агент смотрит на юг
 bdd South_next;
 
-bdd East;
+bdd East;      // агент смотрит на восток
 bdd East_next;
 
-bdd V[N]; //посещена агентом
+bdd V[N];       // посещённые агентом клетки
 bdd V_next[N];
 
-bdd OK[N]; //безопасная клетка
+bdd OK[N];      // безопасные клетки
 bdd OK_next[N];
 
-//переменные действия, ЗАВИСЯТ ОТ ВРЕМЕНИ
+#pragma endregion 
+
+//переменные действия, ЗАВИСЯЩИЕ ОТ ВРЕМЕНИ
+#pragma region Time-dependent action variables
+
 bdd Forward;
 bdd Forward_next;
 
@@ -108,10 +115,13 @@ bdd Climb_next;
 bdd Shoot;
 bdd Shoot_next;
 
+#pragma endregion 
+
+//массив проверенных клеток
 bool checked_cells[N] = { true, false, false, false,
                           false, false, false, false,
                           false, false, false, false,
-                          false, false, false, false };  //массив проверенных клеток
+                          false, false, false, false };
 
 bool not_safe_cells[N]; //массив небезопасных клеток
 
@@ -120,42 +130,13 @@ bool unknown_cells[N]; //пока не можем говорить, безопасные или нет
 bool safe_cells[N] = { true, false, false, false,
                        false, false, false, false,
                        false, false, false, false, 
-                       false, false, false, false};
+                       false, false, false, false}; //массив безопасных клеток
 
 stack <int> cells[N]; //стек для хранения предыдущей клетки
 
 // флаги для символьных вычислений
 bool flag = false;
 bool to_stop_recursion;
-
-// Определение соседей относительно клетки cell
-vector<int> neighbours(int cell)
-{
-    vector <int> neighbours;
-
-    // если ячейка не в крайнем левом столбце
-    if (cell % N_COLUMN != 0)
-    {
-        neighbours.push_back(cell - 1);
-    }
-    // если ячейка не в крайнем правом столбце
-    if ((cell + 1) % N_COLUMN != 0)
-    {
-        neighbours.push_back(cell + 1);
-    }
-    // если ячейка не на самой нижней строке
-    if (cell < N_COLUMN * (N_ROW - 1))
-    {
-        neighbours.push_back(cell + N_COLUMN);
-    }
-    // если ячейка не на самой верхней строке
-    if (cell >= N_COLUMN)
-    {
-        neighbours.push_back(cell - N_COLUMN);
-    }
-
-    return neighbours;
-}
 
 stack <bdd> plan;
 stack <string> str_plan;
@@ -170,17 +151,26 @@ int main()
     bdd_setvarnum(N_VAR);         // Задаем количество булевых переменных
 
     cout << " 1 - Agent\n"
-        << " 2 - Wumpus\n"
-        << " 3 - PIT\n"
-        << " 4 - GOLD\n"
-        << " 22 - Stench\n"
-        << " 33 - Breeze" << endl;
+         << " 2 - Wumpus\n"
+         << " 3 - PIT\n"
+         << " 4 - GOLD\n"
+         << " 22 - Stench\n"
+         << " 33 - Breeze" << endl;
 
     bdd task = bddtrue; //Решение. Изначально true. Здесь будет находиться база
     bdd movements = bddtrue;
 
-    //////////////////////////////////// С Т А Т И К А ////////////////////////////////////////////////
+    // Статика
     {
+        // Выделение bool переменных
+        // для Вампуса 0..N
+        // для запаха  N..N*2
+        // для ям      N*2..N*3
+        // для ветра   N*3..N*4
+        // Для золота  N*4..N*5
+
+        // TODO можно объеденить в один цикл
+
         // для Вампуса
         for (int i = 0; i < N; i++)
         {
@@ -216,14 +206,12 @@ int main()
             countvar++;
         }
 
-        //для Stench
-
-        Stench = bdd_ithvar(countvar); // переменной запаха
+        //для Stench (запах)
+        Stench = bdd_ithvar(countvar);
         countvar++;
 
-        //для Breeze
-
-        Breeze = bdd_ithvar(countvar); // переменной ветра
+        //для Breeze (ветер)
+        Breeze = bdd_ithvar(countvar);
         countvar++;
 
         //для Scream
@@ -231,414 +219,241 @@ int main()
         countvar++;
     }
 
-	///////////////////////////////////////////////Д И Н А М И К А//////////////////////////////////////////////////////
-
-	//для нахождения агента в клетке
-	for (int i = 0; i < N; i++)
-	{
-		L[i] = bdd_ithvar(countvar);
-		countvar++;
-	}
+    ///////////////////////////////////////////////Д И Н А М И К А//////////////////////////////////////////////////////
+    {
+        // для нахождения агента в клетке
+        for (int i = 0; i < N; i++)
+        {
+            L[i] = bdd_ithvar(countvar);
+            countvar++;
+        }
+
+        // для посещение клетки агентом
+        for (int i = 0; i < N; i++)
+        {
+            V[i] = bdd_ithvar(countvar);
+            countvar++;
+        }
+
+        //для безопасной клетки
+        for (int i = 0; i < N; i++)
+        {
+            OK[i] = bdd_ithvar(countvar);
+            countvar++;
+        }
+
+        //для стрелы
+        HaveArrow = bdd_ithvar(countvar); //есть стрела в текущей клетке
+        countvar++;
+
+        //для того что Вампус жив
+        WumpusAlive = bdd_ithvar(countvar);
+        countvar++;
+
+        //для направлений
+        East = bdd_ithvar(countvar);
+        countvar++;
 
-	//для посещение клетки агентом
-	for (int i = 0; i < N; i++)
-	{
-		V[i] = bdd_ithvar(countvar);
-		countvar++;
-	}
+        South = bdd_ithvar(countvar);
+        countvar++;
 
-	//для безопасной клетки
-	for (int i = 0; i < N; i++)
-	{
-		OK[i] = bdd_ithvar(countvar);
-		countvar++;
-	}
+        West = bdd_ithvar(countvar);
+        countvar++;
 
-	//для стрелы
-	HaveArrow = bdd_ithvar(countvar); //есть стрела в текущей клетке
-	countvar++;
+        North = bdd_ithvar(countvar);
+        countvar++;
 
-	//для того что Вампус жив
-	WumpusAlive = bdd_ithvar(countvar);
-	countvar++;
+        //для действий (форвард, тёрнлефт, тёрнрайт)
+        Forward = bdd_ithvar(countvar);
+        countvar++;
 
-	//для направлений
-	East = bdd_ithvar(countvar);
-	countvar++;
+        TurnLeft = bdd_ithvar(countvar);
+        countvar++;
+
+        TurnRight = bdd_ithvar(countvar);
+        countvar++;
+
+        Grab = bdd_ithvar(countvar);
+        countvar++;
 
-	South = bdd_ithvar(countvar);
-	countvar++;
+        Climb = bdd_ithvar(countvar);
+        countvar++;
 
-	West = bdd_ithvar(countvar);
-	countvar++;
+        Shoot = bdd_ithvar(countvar);
+        countvar++;
 
-	North = bdd_ithvar(countvar);
-	countvar++;
+        //для состояний агента (золото, вылез ли из пещеры?)
 
-	//для действий (форвард, тёрнлефт, тёрнрайт)
-	Forward = bdd_ithvar(countvar);
-	countvar++;
+        ClimbedOut = bdd_ithvar(countvar);
+        countvar++;
 
-	TurnLeft = bdd_ithvar(countvar);
-	countvar++;
+        HaveGold = bdd_ithvar(countvar);
+        countvar++;
+    }
 
-	TurnRight = bdd_ithvar(countvar);
-	countvar++;
+    // ПЕРЕМЕННЫЕ ДЛЯ СЛЕДУЮЩЕГО СОСТОЯНИЯ
+    {
+        for (int i = 0; i < N; i++)
+        {
+            L_next[i] = bdd_ithvar(countvar);
+            countvar++;
+        }
 
-	Grab = bdd_ithvar(countvar);
-	countvar++;
-
-	Climb = bdd_ithvar(countvar);
-	countvar++;
-
-	Shoot = bdd_ithvar(countvar);
-	countvar++;
-
-	//для состояний агента (золото, вылез ли из пещеры?)
-
-	ClimbedOut = bdd_ithvar(countvar);
-	countvar++;
-
-	HaveGold = bdd_ithvar(countvar);
-	countvar++;
-
-	////////////////////////////////////////ПЕРЕМЕННЫЕ ДЛЯ СЛЕДУЮЩЕГО СОСТОЯНИЯ///////////////////////////////////////
-
-	for (int i = 0; i < N; i++)
-	{
-		L_next[i] = bdd_ithvar(countvar);
-		countvar++;
-	}
-
-	for (int i = 0; i < N; i++)
-	{
-		V_next[i] = bdd_ithvar(countvar);
-		countvar++;
-	}
-
-	for (int i = 0; i < N; i++)
-	{
-		OK_next[i] = bdd_ithvar(countvar);
-		countvar++;
-	}
-
-	HaveArrow_next = bdd_ithvar(countvar); //нет стрелы
-	countvar++;
-
-	//для того что Вампус жив
-	WumpusAlive_next = bdd_ithvar(countvar);
-	countvar++;
-
-	//для направлений
-	East_next = bdd_ithvar(countvar);
-	countvar++;
-
-	South_next = bdd_ithvar(countvar);
-	countvar++;
-
-	West_next = bdd_ithvar(countvar);
-	countvar++;
-
-	North_next = bdd_ithvar(countvar);
-	countvar++;
-
-	//для действий (форвард, тёрнлефт, тёрнрайт)
-	Forward_next = bdd_ithvar(countvar);
-	countvar++;
-
-	TurnLeft_next = bdd_ithvar(countvar);
-	countvar++;
-
-	TurnRight_next = bdd_ithvar(countvar);
-	countvar++;
-
-	Grab_next = bdd_ithvar(countvar);
-	countvar++;
-
-	Climb_next = bdd_ithvar(countvar);
-	countvar++;
-
-	Shoot_next = bdd_ithvar(countvar);
-	countvar++;
-
-	//для состояний агента (золото, вылез ли из пещеры?)
-
-	ClimbedOut_next = bdd_ithvar(countvar);
-	countvar++;
-
-	HaveGold_next = bdd_ithvar(countvar);
-	countvar++;
-
-
-
-
-	// НАЧАЛЬНАЯ БЗ АГЕНТА                                          ПРОВЕРЕНО
-	task &= L[0];
-	task &= V[0];
-	task &= OK[0];
-
-	for (int i = 1; i < N; i++)
-	{
-		task &= !L[i];
-		task &= !V[i];
-	}
-
-	task &= !P[0];
-	task &= !W[0];
-
-	task &= HaveArrow; //есть стрела
-	task &= WumpusAlive;
-
-	task &= East;
-	task &= !West;
-	task &= !South;
-	task &= !North;
-
-	task &= !Forward;
-	task &= !TurnLeft;
-	task &= !TurnRight;
-
-	task &= !Grab;
-	task &= !Shoot;
-	task &= !Climb;
-
-	task &= !ClimbedOut;
-	task &= !HaveGold;
-
-	/////////////////////////////////////////////// БАЗА ЗНАНИЙ НЕ ЗАВИСЯЩАЯ ОТ ВРЕМЕНИ //////////////////////////////////////////// 
-
-	for (int i = 0; i < N; i++)
-	{
-
-		if (i == 0) //для начальной, нулевой клетки (0)
-		{
-			bdd temp = bddtrue;
-
-			temp &= !B[i] ^ (P[i + 1] | P[i + N_COLUMN]);
-			temp &= !P[i] ^ (B[i + 1] & B[i + N_COLUMN]);
-			temp &= !S[i] ^ ((!W[i + 1] & W[i + N_COLUMN]) | (W[i + 1] & !W[i + N_COLUMN])); // либо | между скобками, либо ^ (исключающее ИЛИ)
-			temp &= !W[i] ^ (S[i] & S[i + 1]);
-
-			task &= temp;
-		}
-		else if (i % N_COLUMN == 0 && i != N - N_COLUMN && i != 0) //для 4 и 8
-		{
-			bdd temp = bddtrue;
-
-			temp &= !B[i] ^ (P[i + 1] | P[i + N_COLUMN] | P[i - N_COLUMN]);
-			temp &= !P[i] ^ (B[i + 1] & B[i + N_COLUMN] & B[i - N_COLUMN]);
-			temp &= !S[i] ^ ((W[i + 1] & !W[i + N_COLUMN] & !W[i - N_COLUMN]) | (!W[i + 1] & W[i + N_COLUMN] & !W[i - N_COLUMN]) | (!W[i + 1] & !W[i + N_COLUMN] & W[i - N_COLUMN]));
-			temp &= !W[i] ^ (S[i] & S[i + N_COLUMN] & S[i - N_COLUMN]);
-
-			task &= temp;
-		}
-
-		else if (i % N_COLUMN == 0 && i == N - N_COLUMN) //для 12
-		{
-
-			bdd temp = bddtrue;
-
-			temp &= !B[i] ^ (P[i + 1] | P[i - N_COLUMN]);
-			temp &= !P[i] ^ (B[i + 1] & B[i - N_COLUMN]);
-			temp &= !S[i] ^ ((W[i + 1] & !W[i - N_COLUMN]) | (!W[i + 1] & W[i - N_COLUMN]));
-			temp &= !W[i] ^ (S[i + 1] & S[i - N_COLUMN]);
-
-			task &= temp;
-		}
-
-		else if (i / N_COLUMN == 0 && i != N_COLUMN - 1 && i != 0) //для 1 и 2
-		{
-
-			bdd temp = bddtrue;
-
-			temp &= !B[i] ^ (P[i + 1] | P[i - 1] | P[i + N_COLUMN]);
-			temp &= !P[i] ^ (B[i + 1] & B[i - 1] & B[i + N_COLUMN]);
-			temp &= !S[i] ^ ((W[i + 1] & !W[i - 1] & !W[i + N_COLUMN]) | (!W[i + 1] & W[i - 1] & !W[i + N_COLUMN]) | (!W[i + 1] & !W[i - 1] & W[i + N_COLUMN]));
-			temp &= !W[i] ^ (S[i + 1] & S[i - 1] & S[i + N_COLUMN]);
-
-			task &= temp;
-		}
-
-		else if (i / N_COLUMN == 0 && i == N_COLUMN - 1) //для 3
-		{
-
-			bdd temp = bddtrue;
-
-			temp &= !B[i] ^ (P[i - 1] | P[i + N_COLUMN]);
-			temp &= !P[i] ^ (B[i - 1] & B[i + N_COLUMN]);
-			temp &= !S[i] ^ ((W[i - 1] & !W[i + N_COLUMN]) | (!W[i - 1] & W[i + N_COLUMN]));
-			temp &= !W[i] ^ (S[i - 1] & S[i + N_COLUMN]);
-
-			task &= temp;
-		}
-
-		else if (i % N_COLUMN == N_COLUMN - 1 && i != N - 1) //для 7 и 11
-		{
-
-			bdd temp = bddtrue;
-
-			temp &= !B[i] ^ (P[i - 1] | P[i - N_COLUMN] | P[i + N_COLUMN]);
-			temp &= !P[i] ^ (B[i - 1] & B[i - N_COLUMN] & B[i + N_COLUMN]);
-			temp &= !S[i] ^ ((W[i - 1] & !W[i - N_COLUMN] & !W[i + N_COLUMN]) | (!W[i - 1] & W[i - N_COLUMN] & !W[i + N_COLUMN]) | (!W[i - 1] & !W[i - N_COLUMN] & W[i + N_COLUMN]));
-			temp &= !W[i] ^ (S[i - 1] & S[i - N_COLUMN] & S[i + N_COLUMN]);
-
-			task &= temp;
-		}
-
-		else if (i % N_COLUMN == N_COLUMN - 1 && i == N - 1) //для 15
-		{
-
-			bdd temp = bddtrue;
-
-			temp &= !B[i] ^ (P[i - 1] | P[i - N_COLUMN]);
-			temp &= !P[i] ^ (B[i - 1] & B[i - N_COLUMN]);
-			temp &= !S[i] ^ ((W[i - 1] & !W[i - N_COLUMN]) | (!W[i - 1] & W[i - N_COLUMN]));
-			temp &= !W[i] ^ (S[i - 1] & S[i - N_COLUMN]);
-
-			task &= temp;
-		}
-
-		else if (i / N_ROW == N_ROW - 1 && i != N - N_ROW && i != N - 1) //для 13 и 14
-		{
-
-			bdd temp = bddtrue;
-
-			temp &= !B[i] ^ (P[i - 1] | P[i + 1] | P[i - N_COLUMN]);
-			temp &= !P[i] ^ (B[i - 1] & B[i + 1] & B[i - N_COLUMN]);
-			temp &= !S[i] ^ ((W[i - 1] & !W[i + 1] & !W[i - N_COLUMN]) | (!W[i - 1] & W[i + 1] & !W[i - N_COLUMN]) | (!W[i - 1] & !W[i + 1] & W[i - N_COLUMN]));
-			temp &= !W[i] ^ (S[i - 1] & S[i + 1] & S[i - N_COLUMN]);
-
-			task &= temp;
-		}
-		else if (i % N_COLUMN != 0 && i % N_COLUMN != N_COLUMN - 1 && i / N_COLUMN != 0 && i / N_COLUMN != N_COLUMN - 1) //для тех, что в серединке (5,6,9,10)
-		{
-
-			bdd temp = bddtrue;
-
-			temp &= !B[i] ^ (P[i - 1] | P[i + 1] | P[i - N_COLUMN] | P[i + N_COLUMN]);
-			temp &= !P[i] ^ (B[i - 1] & B[i + 1] & B[i - N_COLUMN] & B[i + N_COLUMN]);
-			temp &= !S[i] ^ ((W[i - 1] & !W[i + 1] & !W[i - N_COLUMN] & !W[i + N_COLUMN]) | (!W[i - 1] & W[i + 1] & !W[i - N_COLUMN] & !W[i + N_COLUMN]) | (!W[i - 1] & !W[i + 1] & W[i - N_COLUMN] & !W[i + N_COLUMN]) | (!W[i + 1] & !W[i - 1] & !W[i - N_COLUMN] & W[i + N_COLUMN]));
-			temp &= !W[i] ^ (S[i - 1] & S[i + 1] & S[i - N_COLUMN] & S[i + N_COLUMN]);
-
-			task &= temp;
-		}
-	}
-
-//for (int i = 0; i < N; i++) //для карты 3х3
-//{
-//
-//	if (i == 0) //для начальной, нулевой клетки (0)
-//	{
-//		bdd temp = bddtrue;
-//
-//		temp &= !B[i] ^ (P[i + 1] | P[i + N_COLUMN]);
-//		temp &= !P[i] ^ (B[i + 1] & B[i + N_COLUMN]);
-//		temp &= !S[i] ^ ((!W[i + 1] & W[i + N_COLUMN]) | (W[i + 1] & !W[i + N_COLUMN]));
-//		temp &= !W[i] ^ (S[i] & S[i + 1]);
-//
-//		task &= temp;
-//	}
-//	else if ((i / N_COLUMN == 0 && i != N_COLUMN - 1 && i != 0)) //для 1
-//	{
-//
-//		bdd temp = bddtrue;
-//
-//		temp &= !B[i] ^ (P[i + 1] | P[i - 1] | P[i + N_COLUMN]);
-//		temp &= !P[i] ^ (B[i + 1] & B[i - 1] & B[i + N_COLUMN]);
-//		temp &= !S[i] ^ ((W[i + 1] & !W[i - 1] & !W[i + N_COLUMN]) | (!W[i + 1] & W[i - 1] & !W[i + N_COLUMN]) | (!W[i + 1] & !W[i - 1] & W[i + N_COLUMN]));
-//		temp &= !W[i] ^ (S[i + 1] & S[i - 1] & S[i + N_COLUMN]);
-//
-//		task &= temp;
-//	}
-//	else if (i == N_ROW - 1) //для 2
-//	{
-//
-//		bdd temp = bddtrue;
-//
-//		temp &= !B[i] ^ (P[i - 1] | P[i + N_COLUMN]);
-//		temp &= !P[i] ^ (B[i - 1] & B[i + N_COLUMN]);
-//		temp &= !S[i] ^ ((!W[i - 1] & W[i + N_COLUMN]) | (W[i - 1] & !W[i + N_COLUMN]));
-//		temp &= !W[i] ^ (S[i - 1] & S[i + N_COLUMN]);
-//
-//		task &= temp;
-//	}
-//	else if (i == N_COLUMN) //для 3
-//	{
-//
-//		bdd temp = bddtrue;
-//
-//		temp &= !B[i] ^ (P[i + 1] | P[i - N_COLUMN] | P[i + N_COLUMN]);
-//		temp &= !P[i] ^ (B[i + 1] & B[i - N_COLUMN] & B[i + N_COLUMN]);
-//		temp &= !S[i] ^ ((W[i + 1] & !W[i - N_COLUMN] & !W[i + N_COLUMN]) | (!W[i + 1] & W[i - N_COLUMN] & !W[i + N_COLUMN]) | (!W[i + 1] & !W[i - N_COLUMN] & W[i + N_COLUMN]));
-//		temp &= !W[i] ^ (S[i + 1] & S[i - N_COLUMN] & S[i + N_COLUMN]);
-//
-//		task &= temp;
-//	}
-//	else if (i % N_COLUMN == 1 && i / N_COLUMN == 1 && i != 0) //для 4
-//	{
-//
-//				bdd temp = bddtrue;
-//
-//				temp &= !B[i] ^ (P[i - 1] | P[i + 1] | P[i - N_COLUMN] | P[i + N_COLUMN]);
-//				temp &= !P[i] ^ (B[i - 1] & B[i + 1] & B[i - N_COLUMN] & B[i + N_COLUMN]);
-//				temp &= !S[i] ^ ((W[i - 1] & !W[i + 1] & !W[i - N_COLUMN] & !W[i + N_COLUMN]) | (!W[i - 1] & W[i + 1] & !W[i - N_COLUMN] & !W[i + N_COLUMN]) | (!W[i - 1] & !W[i + 1] & W[i - N_COLUMN] & !W[i + N_COLUMN]) | (!W[i + 1] & !W[i - 1] & !W[i - N_COLUMN] & W[i + N_COLUMN]));
-//				temp &= !W[i] ^ (S[i - 1] & S[i + 1] & S[i - N_COLUMN] & S[i + N_COLUMN]);
-//
-//				task &= temp;
-//	}
-//	else if (i % N_COLUMN == N_COLUMN - 1 && i != N - 1) //для 5
-//	{
-//
-//		bdd temp = bddtrue;
-//
-//		temp &= !B[i] ^ (P[i + N_COLUMN] | P[i - 1] | P[i - N_COLUMN]);
-//		temp &= !P[i] ^ (B[i + N_COLUMN] & B[i - 1] & B[i - N_COLUMN]);
-//		temp &= !S[i] ^ ((W[i + N_COLUMN] & !W[i - 1] & !W[i - N_COLUMN]) | (!W[i + N_COLUMN] & W[i - 1] & !W[i - N_COLUMN]) | (!W[i + N_COLUMN] & !W[i - 1] & W[i - N_COLUMN]));
-//		temp &= !W[i] ^ (S[i + N_COLUMN] & S[i - 1] & S[i - N_COLUMN]);
-//
-//		task &= temp;
-//	}
-//	else if (i % N_COLUMN == 0 && i / N_COLUMN == N_COLUMN - 1) //для 6
-//	{
-//
-//		bdd temp = bddtrue;
-//
-//		temp &= !B[i] ^ (P[i + 1] | P[i - N_COLUMN]);
-//		temp &= !P[i] ^ (B[i + 1] & B[i - N_COLUMN]);
-//		temp &= !S[i] ^ ((!W[i + 1] & W[i - N_COLUMN]) | (W[i + 1] & !W[i - N_COLUMN]));
-//		temp &= !W[i] ^ (S[i + 1] & S[i - N_COLUMN]);
-//
-//		task &= temp;
-//	}
-//	else if (i % N_COLUMN == 1 && i / N_COLUMN == N_COLUMN - 1) //для 7
-//	{
-//
-//		bdd temp = bddtrue;
-//
-//		temp &= !B[i] ^ (P[i + 1] | P[i - 1] | P[i - N_COLUMN]);
-//		temp &= !P[i] ^ (B[i + 1] & B[i - 1] & B[i - N_COLUMN]);
-//		temp &= !S[i] ^ ((W[i + 1] & !W[i - 1] & !W[i - N_COLUMN]) | (!W[i + 1] & W[i - 1] & !W[i - N_COLUMN]) | (!W[i + 1] & !W[i - 1] & W[i - N_COLUMN]));
-//		temp &= !W[i] ^ (S[i + 1] & S[i - 1] & S[i - N_COLUMN]);
-//
-//		task &= temp;
-//	}
-//	else if (i == N - 1) //для 8
-//	{
-//
-//		bdd temp = bddtrue;
-//
-//		temp &= !B[i] ^ (P[i - 1] | P[i - N_COLUMN]);
-//		temp &= !P[i] ^ (B[i - 1] & B[i - N_COLUMN]);
-//		temp &= !S[i] ^ ((W[i - 1] & !W[i - N_COLUMN]) | (!W[i - 1] & W[i - N_COLUMN]));
-//		temp &= !W[i] ^ (S[i - 1] & S[i - N_COLUMN]);
-//
-//		task &= temp;
-//	}
-//}
-
-	/////////////////////////////////////////////////////////// ДВЕ ФУНКЦИИ ПРО ВАМПУСА //////////////////////////////////////// 
-
-	bdd temp_w = bddfalse;
+        for (int i = 0; i < N; i++)
+        {
+            V_next[i] = bdd_ithvar(countvar);
+            countvar++;
+        }
+
+        for (int i = 0; i < N; i++)
+        {
+            OK_next[i] = bdd_ithvar(countvar);
+            countvar++;
+        }
+
+        HaveArrow_next = bdd_ithvar(countvar); //нет стрелы
+        countvar++;
+
+        //для того что Вампус жив
+        WumpusAlive_next = bdd_ithvar(countvar);
+        countvar++;
+
+        //для направлений
+        East_next = bdd_ithvar(countvar);
+        countvar++;
+
+        South_next = bdd_ithvar(countvar);
+        countvar++;
+
+        West_next = bdd_ithvar(countvar);
+        countvar++;
+
+        North_next = bdd_ithvar(countvar);
+        countvar++;
+
+        //для действий (форвард, тёрнлефт, тёрнрайт)
+        Forward_next = bdd_ithvar(countvar);
+        countvar++;
+
+        TurnLeft_next = bdd_ithvar(countvar);
+        countvar++;
+
+        TurnRight_next = bdd_ithvar(countvar);
+        countvar++;
+
+        Grab_next = bdd_ithvar(countvar);
+        countvar++;
+
+        Climb_next = bdd_ithvar(countvar);
+        countvar++;
+
+        Shoot_next = bdd_ithvar(countvar);
+        countvar++;
+
+        //для состояний агента (золото, вылез ли из пещеры?)
+
+        ClimbedOut_next = bdd_ithvar(countvar);
+        countvar++;
+
+        HaveGold_next = bdd_ithvar(countvar);
+        countvar++;
+    }
+
+    // НАЧАЛЬНАЯ БЗ АГЕНТА                                          ПРОВЕРЕНО
+    task &= L[0];
+    task &= V[0];
+    task &= OK[0];
+
+    for (int i = 1; i < N; i++)
+    {
+        task &= !L[i];
+        task &= !V[i];
+    }
+
+    task &= !P[0];
+    task &= !W[0];
+
+    task &= HaveArrow; //есть стрела
+    task &= WumpusAlive;
+
+    task &= East;
+    task &= !West;
+    task &= !South;
+    task &= !North;
+
+    task &= !Forward;
+    task &= !TurnLeft;
+    task &= !TurnRight;
+
+    task &= !Grab;
+    task &= !Shoot;
+    task &= !Climb;
+
+    task &= !ClimbedOut;
+    task &= !HaveGold;
+
+    // Формируем базу знаний не зависящую от времени
+    for (int i = 0; i < N; i++)
+    {
+        vector<int> pos;
+
+        // если ячейка не в крайнем левом столбце
+        if (i % N_COLUMN != 0)
+        {
+            pos.push_back(i - 1);
+        }
+        // если ячейка не в крайнем правом столбце
+        if ((i + 1) % N_COLUMN != 0)
+        {
+            pos.push_back(i + 1);
+        }
+        // если ячейка не на самой нижней строке
+        if (i < N_COLUMN * (N_ROW - 1))
+        {
+            pos.push_back(i + N_COLUMN);
+        }
+        // если ячейка не на самой верхней строке
+        if (i >= N_COLUMN)
+        {
+            pos.push_back(i - N_COLUMN);
+        }
+
+        // формируем tempB, tempP, tempS.
+        // отдельно формируем tempW
+        // tempW это формула вида: (x1*!x2*..*!xn) | (!x1*x2*!x3*..*!xn) | .. | (!x1*..!x(n-1)*xn)
+        bdd tempP = bddfalse;
+        bdd tempB = bddtrue;
+        bdd tempW = bddfalse;
+        bdd tempS = bddtrue;
+        for (int i = 0; i < pos.size(); ++i)
+        {
+            tempP |= P[pos[i]];
+            tempB &= B[pos[i]];
+            tempS &= S[pos[i]];
+            bdd temp = bddtrue;
+            for (int j = 0; j < pos.size(); ++j)
+            {
+                if (i == j)
+                {
+                    temp &= W[pos[j]];
+                }
+                else
+                {
+                    temp &= !W[pos[j]];
+                }
+            }
+            tempW |= temp;
+        }
+
+        task &= (!B[i] ^ tempP) &
+                (!P[i] ^ tempB) &
+                (!S[i] ^ tempW) &
+                (!W[i] ^ tempS);
+    }
+
+    /////////////////////////////////////////////////////////// ДВЕ ФУНКЦИИ ПРО ВАМПУСА //////////////////////////////////////// 
+
+    bdd temp_w = bddfalse;
 	for (int i = 0; i < N; i++)
 	{
 		temp_w |= W[i];
@@ -799,24 +614,24 @@ int main()
     w = x[8] & x[9];   // 11
 
     bdd R = q[0] & e & qq[1] | q[0] & s & qq[4] |
-        q[1] & w & qq[0] | q[1] & s & qq[5] | q[1] & e & qq[2] |
-        q[2] & w & qq[1] | q[2] & s & qq[6] | q[2] & e & qq[3] |
-        q[3] & w & qq[2] | q[3] & s & qq[7] |
+            q[1] & w & qq[0] | q[1] & s & qq[5] | q[1] & e & qq[2] |
+            q[2] & w & qq[1] | q[2] & s & qq[6] | q[2] & e & qq[3] |
+            q[3] & w & qq[2] | q[3] & s & qq[7] |
 
-        q[4] & e & qq[5] | q[4] & s & qq[8] | q[4] & n & qq[0] |
-        q[5] & w & qq[4] | q[5] & s & qq[9] | q[5] & n & qq[1] | q[5] & e & qq[6] |
-        q[6] & e & qq[7] | q[6] & n & qq[2] | q[6] & w & qq[5] | q[6] & s & qq[10] |
-        q[7] & s & qq[11] | q[7] & w & qq[6] | q[7] & n & qq[3] |
+            q[4] & e & qq[5] | q[4] & s & qq[8] | q[4] & n & qq[0] |
+            q[5] & w & qq[4] | q[5] & s & qq[9] | q[5] & n & qq[1] | q[5] & e & qq[6] |
+            q[6] & e & qq[7] | q[6] & n & qq[2] | q[6] & w & qq[5] | q[6] & s & qq[10] |
+            q[7] & s & qq[11] | q[7] & w & qq[6] | q[7] & n & qq[3] |
 
-        q[8] & e & qq[9] | q[8] & n & qq[4] | q[8] & s & qq[12] |
-        q[9] & e & qq[10] | q[9] & w & qq[8] | q[9] & n & qq[5] | q[9] & s & qq[13] |
-        q[10] & e & qq[11] | q[10] & w & qq[9] | q[10] & n & qq[6] | q[10] & s & qq[14] |
-        q[11] & w & qq[10] | q[11] & s & qq[15] | q[11] & n & qq[7] |
+            q[8] & e & qq[9] | q[8] & n & qq[4] | q[8] & s & qq[12] |
+            q[9] & e & qq[10] | q[9] & w & qq[8] | q[9] & n & qq[5] | q[9] & s & qq[13] |
+            q[10] & e & qq[11] | q[10] & w & qq[9] | q[10] & n & qq[6] | q[10] & s & qq[14] |
+            q[11] & w & qq[10] | q[11] & s & qq[15] | q[11] & n & qq[7] |
 
-        q[12] & e & qq[13] | q[12] & n & qq[8] |
-        q[13] & e & qq[14] | q[13] & w & qq[12] | q[13] & n & qq[9] |
-        q[14] & e & qq[15] | q[14] & w & qq[13] | q[14] & n & qq[10] |
-        q[15] & w & qq[14] | q[15] & n & qq[11];
+            q[12] & e & qq[13] | q[12] & n & qq[8] |
+            q[13] & e & qq[14] | q[13] & w & qq[12] | q[13] & n & qq[9] |
+            q[14] & e & qq[15] | q[14] & w & qq[13] | q[14] & n & qq[10] |
+            q[15] & w & qq[14] | q[15] & n & qq[11];
 
 	// начинаем всегда с 0 клетки
 	int current_cell = 0;
@@ -853,6 +668,7 @@ int main()
 	stack <int> previous_cell;
 
 	auto start = std::chrono::high_resolution_clock::now();
+
 	cout << "Current cell is 0" << endl;
 	do { 
 
@@ -949,15 +765,44 @@ int main()
 		cout << "Current cell is " << current_cell << endl;
 
 	} while (gold_flag != true);
+
 	auto diff = std::chrono::high_resolution_clock::now() - start; // разница 
 	auto nsec = std::chrono::duration_cast<std::chrono::nanoseconds>(diff);
 	cout << "It took: " << nsec.count() << " nanoseconds" << endl;
 
 	bdd_done();
 	system("pause");
+    return 0;
 }
 
-char var[N_VAR];
+// Определение соседей относительно клетки cell
+vector<int> neighbours(int cell)
+{
+    vector <int> neighbours;
+
+    // если ячейка не в крайнем левом столбце
+    if (cell % N_COLUMN != 0)
+    {
+        neighbours.push_back(cell - 1);
+    }
+    // если ячейка не в крайнем правом столбце
+    if ((cell + 1) % N_COLUMN != 0)
+    {
+        neighbours.push_back(cell + 1);
+    }
+    // если ячейка не на самой нижней строке
+    if (cell < N_COLUMN * (N_ROW - 1))
+    {
+        neighbours.push_back(cell + N_COLUMN);
+    }
+    // если ячейка не на самой верхней строке
+    if (cell >= N_COLUMN)
+    {
+        neighbours.push_back(cell - N_COLUMN);
+    }
+
+    return neighbours;
+}
 
 int check_for_safety(bdd task, int current_cell) //проверка клетки на безопасность
 {
@@ -1516,43 +1361,3 @@ void find_path(bdd relation, bdd first_state, bdd* q, bdd* qq, bdd wished_state,
 	}
 }
 
-// не использую эти функции
-//void print()
-//{
-//	for (unsigned i = 0; i < N; i++)
-//	{
-//		out << i << ": ";
-//		int num = 0;
-//		num += (unsigned)(var[i]);
-//		out << num << " ";
-//		out << endl;
-//	}
-//	out << endl;
-//}
-//void build(char* varset, int n, int I)
-//{
-//	if (I == n - 1) {
-//		if (varset[I] >= 0) {
-//			var[I] = varset[I];
-//			print();
-//			return;
-//		}
-//		var[I] = 0;
-//		print();
-//		var[I] = 1;
-//		print();
-//		return;
-//	}
-//	if (varset[I] >= 0) {
-//		var[I] = varset[I];
-//		build(varset, n, I + 1);
-//		return;
-//	}
-//	var[I] = 0;
-//	build(varset, n, I + 1);
-//	var[I] = 1;
-//	build(varset, n, I + 1);
-//}
-//void fun(char* varset, int size) {
-//	build(varset, size, 0);
-//}
