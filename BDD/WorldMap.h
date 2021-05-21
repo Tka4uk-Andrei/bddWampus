@@ -35,24 +35,40 @@ enum class Node : int
 // “.к. на одной клетке могут быть несколько свойств, возможно 
 // лучше их как-то отдельно кодировать, чтобы на карте был всегда один номер
 
-//карта 4х4
-vector<std::vector<int>> real_cave2 = { {1},     {0},  {33}, {3},
-                                        {0},     {33}, {3},  {33},
-                                        {0},     {22}, {33}, {0},
-                                        {4, 22}, {2},  {22}, {0}};
+struct Map 
+{
+    vector <vector<Node>> cave;
+    uint nRow;
+    uint nColumn;
+};
 
-//vector<std::vector<int>> real_cave2 = { {Node::Agent},              {Node::None},   {Node::Breeze}, {Node::Pit},
-//                                        {Node::None},               {Node::Breeze}, {Node::Pit},    {Node::Breeze},
-//                                        {Node::None},               {Node::Stench}, {Node::Breeze}, {Node::None},
-//                                        {Node::Gold, Node::Stench}, {Node::Wumpus}, {Node::Stench}, {Node::None} };
+////карта 4х4
+//vector<std::vector<int>> real_cave2 = { {1},     {0},  {33}, {3},
+//                                        {0},     {33}, {3},  {33},
+//                                        {0},     {22}, {33}, {0},
+//                                        {4, 22}, {2},  {22}, {0}};
+
+// карта 4х4
+vector<std::vector<Node>> real_cave2 = {{Node::AGENT},              {Node::NONE},   {Node::BREEZE}, {Node::PIT},
+                                        {Node::NONE},               {Node::BREEZE}, {Node::PIT},    {Node::BREEZE},
+                                        {Node::NONE},               {Node::STENCH}, {Node::BREEZE}, {Node::NONE},
+                                        {Node::GOLD, Node::STENCH}, {Node::WUMPUS}, {Node::STENCH}, {Node::NONE} };
 
 //карта 3х3
 //vector<std::vector<Node>> real_cave3 = { {Node::Agent},  {Node::Breeze}, {Node::Pit},
 //                                         {Node::Breeze}, {Node::None},   {Node::Breeze, Node::Gold},
 //                                         {Node::Pit},    {Node::Breeze}, {Node::Pit, Node::Wumpus}};
 
+// «агрузка карты
+Map readMap()
+{
+    Map map;
+
+    return map;
+}
+
 // ¬ывод карты
-void printMap(vector<vector<Node>> map, uint nColumn = N_COLUMN, uint nRow = N_ROW, ostream &out=cout)
+void printMap(vector<vector<Node>> map, ostream& out = cout, uint nColumn = N_COLUMN, uint nRow = N_ROW)
 {
     bool gold_flag = false;
     int k1 = 0;
@@ -70,13 +86,3 @@ void printMap(vector<vector<Node>> map, uint nColumn = N_COLUMN, uint nRow = N_R
         out << endl;
     }
 }
-
-//vector<std::vector<int>> readFromFile(const string& path)
-//{
-//    ifstream in;
-//    in.open();
-//    for ()
-//    {
-//
-//    }
-//}

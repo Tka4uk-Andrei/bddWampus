@@ -28,7 +28,7 @@ ofstream out;
 
 vector<int> neighbourNodes(int cell); // ќпределение соседей относительно клетки cell
 int find_unvisited(bdd task, int current_cell); //прохожусь по сосед€м клетки, смотри те, которые еще не проверены, отправл€ю их на проверку
-bdd ask_and_send_percept(vector<vector <int>> Enviroment, int current_cell); // из i-ой клетки достает воспри€тие (percept)
+bdd ask_and_send_percept(vector<vector <Node>> Enviroment, int current_cell); // из i-ой клетки достает воспри€тие (percept)
 int check_for_safety(bdd task, int current_cell); //провер€ет клетку на безопасность
 int Enviroment(bdd task, int current_cell); //сочетает две функции: поиск соседей и проверку на безопасность
 void find_path(bdd relation, bdd first_state, bdd* q, bdd* qq, bdd wished_state, vector<int> answer, vector<bdd> visited, bdd& direction);
@@ -145,6 +145,8 @@ int main()
     bdd_setvarnum(N_VAR);         // «адаем количество булевых переменных
 
     // »нициализаци€ массивов
+    checked_cells = vector<bool>(N);
+    safe_cells = vector<bool>(N);
     checked_cells[0] = true;
     safe_cells[0] = true;
     for (int i = 1; i < N; ++i)
@@ -534,7 +536,6 @@ int main()
     bdd x[xSize];  // ???
     bdd q[16];  // нештрихованные
     bdd qq[16]; // штрихованные
-    bdd qq1[16]; // штрихованные
 
     // ???
     for (int i = 0; i < xSize; i++)
@@ -545,18 +546,18 @@ int main()
     for (int i = 0; i < N; ++i)
     {
         q[i] = bddtrue;
-        qq1[i] = bddtrue;
+        qq[i] = bddtrue;
         for (int j = 0; j < N_LOG; ++j)
         {
             if (((i >> (N_LOG - 1 - j)) & 1) == 1) // don't ask me why
             {
                 q[i] &= x[j];
-                qq1[i] &= x[j + N_LOG];
+                qq[i] &= x[j + N_LOG];
             }
             else
             {
                 q[i] &= !x[j];
-                qq1[i] &= !x[j + N_LOG];
+                qq[i] &= !x[j + N_LOG];
             }
         }
     }
@@ -573,26 +574,22 @@ int main()
         // если €чейка не в крайнем левом столбце
         if (i % N_COLUMN != 0)
         {
-            R |= q[i]     | e | q[i - 1];
-            R |= q[i - 1] | w | q[i];
+            R |= q[i] & w & qq[i - 1];
         }
         // если €чейка не в крайнем правом столбце
         if ((i + 1) % N_COLUMN != 0)
         {
-            R |= q[i]     | w | q[i + 1];
-            R |= q[i + 1] | e | q[i];
+            R |= q[i] & e & qq[i + 1];
         }
         // если €чейка не на самой нижней строке
         if (i < N_COLUMN * (N_ROW - 1))
         {
-            R |= q[i]            | s | q[i + N_COLUMN];
-            R |= q[i + N_COLUMN] | n | q[i];
+            R |= q[i] & s & qq[i + N_COLUMN];
         }
         // если €чейка не на самой верхней строке
         if (i >= N_COLUMN)
         {
-            R |= q[i]            | n | q[i - N_COLUMN];
-            R |= q[i - N_COLUMN] | s | q[i];
+            R |= q[i] & n & qq[i - N_COLUMN];
         }
     }
 
@@ -601,27 +598,13 @@ int main()
     int cell_to_go = 0;
 
     vector<int> cells_visited_by_agent = { 0 };
-    vector<bool> reverse_cells;
+    vector<bool> reverse_cells(N);
     for (int i = 0; i < N; ++i)
     {
         reverse_cells[i] = false;
     }
 
-    // ¬ывожу карту
-	int k1 = 0;
-	for (unsigned p = 0; p < real_cave2.size(); p++)
-	{
-		cout << "( ";
-		for (unsigned q = 0; q < real_cave2[p].size(); q++)
-		{
-			cout << real_cave2[p][q];
-			cout << " ";
-		}
-		cout << ")";
-		k1++;
-		if (k1 % 4 == 0)
-			cout << "\n";
-	}
+    printMap(real_cave2, cout);
 
 	bdd relation;
 	vector <bdd> visited = { qq[current_cell] };
@@ -633,10 +616,10 @@ int main()
     // «асекаем врем€ старта алгоритма
     auto start = std::chrono::high_resolution_clock::now();
 
-    cout << "Current cell is 0" << endl;
+    cout << "Current cell is " << current_cell << endl;
     bool gold_flag = false;
-    do { 
-
+    do 
+    { 
 		bdd percept = ask_and_send_percept(real_cave2, current_cell);
 		if ((percept &= !G[current_cell]) == bddfalse)
 		{
@@ -817,22 +800,38 @@ int find_unvisited(bdd task, int current_cell) //прохожусь по сосед€м клетки, см
 	return current_cell;
 }
 
-bdd ask_and_send_percept(vector<vector <int>> Enviroment, int current_cell) // в текущей клетке беру percept
+bdd ask_and_send_percept(vector<vector<Node>> Enviroment, int current_cell) // в текущей клетке беру percept
 {
-	{
-		bdd percept = bddtrue;
-		for (int i = 0; i < Enviroment[current_cell].size(); i++)
-		{
-			if (Enviroment[current_cell][i] == 22)
-				percept &= S[current_cell];
-			else if (Enviroment[current_cell][i] == 33)
-				percept &= B[current_cell];
-			else if (Enviroment[current_cell][i] == 4)
-				percept &= G[current_cell];
-			else percept &= !B[current_cell] & !S[current_cell] & !G[current_cell];
-		}
-		return percept;
-	}
+    {
+        bdd percept = bddtrue;
+        for (int i = 0; i < Enviroment[current_cell].size(); i++)
+        {
+            switch (Enviroment[current_cell][i])
+            {
+            case Node::STENCH:
+                percept &= S[current_cell];
+                break;
+            case Node::BREEZE:
+                percept &= B[current_cell];
+                break;
+            case Node::GOLD:
+                percept &= G[current_cell];
+                break;
+            default:
+                percept &= !B[current_cell] & !S[current_cell] & !G[current_cell];
+                break;
+            }
+            //if (Enviroment[current_cell][i] == 22)
+            //    percept &= S[current_cell];
+            //else if (Enviroment[current_cell][i] == 33)
+            //    percept &= B[current_cell];
+            //else if (Enviroment[current_cell][i] == 4)
+            //    percept &= G[current_cell];
+            //else percept &= !B[current_cell] & !S[current_cell] & !G[current_cell];
+
+        }
+        return percept;
+    }
 }
 
 int Enviroment(bdd task, int current_cell)
