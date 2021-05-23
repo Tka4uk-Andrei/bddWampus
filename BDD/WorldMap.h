@@ -86,3 +86,4 @@ void printMap(vector<vector<Node>> map, ostream& out = cout, uint nColumn = N_CO
         out << endl;
     }
 }
+

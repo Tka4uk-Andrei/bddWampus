@@ -1,8 +1,8 @@
 #pragma comment(lib,"bdd.lib")
 #pragma warning (disable : 26444)
 
-#include"bdd.h"
-#include<fstream>
+#include "bdd.h"
+#include <fstream>
 #include <iostream>
 #include <vector>
 #include <cmath>
@@ -13,6 +13,7 @@
 #include <iomanip>
 
 #include "WorldMap.h"
+//#include "PathFinder.h"
 
 using namespace std;
 
@@ -26,13 +27,95 @@ ofstream out;
 #define N_FUNCTIONS_IN_FIELD (4 + 3*4) // до percept здесь было 4+3*2
 #define N_VAR 207
 
-vector<int> neighbourNodes(int cell); // Определение соседей относительно клетки cell
-int find_unvisited(bdd task, int current_cell); //прохожусь по соседям клетки, смотри те, которые еще не проверены, отправляю их на проверку
-bdd ask_and_send_percept(vector<vector <Node>> Enviroment, int current_cell); // из i-ой клетки достает восприятие (percept)
-int check_for_safety(bdd task, int current_cell); //проверяет клетку на безопасность
-int Enviroment(bdd task, int current_cell); //сочетает две функции: поиск соседей и проверку на безопасность
-void find_path(bdd relation, bdd first_state, bdd* q, bdd* qq, bdd wished_state, vector<int> answer, vector<bdd> visited, bdd& direction);
-int move(int cell, string action, bdd& direction);
+// Структура, описывающая переменные действия, ЗАВИСЯЩИЕ ОТ ВРЕМЕНИ
+struct TimeDependentActions
+{
+    bdd Forward;
+    bdd TurnRight;
+    bdd TurnLeft;
+
+    bdd Grab;
+    bdd Climb;
+    bdd Shoot;
+};
+
+// Структура с направлениями, куда смотрит агент, для символьных вычислений
+struct Directions
+{
+    bdd n; // Север
+    bdd e; // Запад
+    bdd s; // Юг
+    bdd w; // Восток
+};
+
+/// <summary>
+///     Определение соседей относительно клетки cell
+/// </summary>
+/// <param name="cell"> Индекс ячейки поля, относительно которой определяются соседи </param>
+/// <returns> Вектор, который который содержит индексы соседей </returns>
+vector<int> neighbourNodes(int cell);
+
+/// <summary>
+///     прохожусь по соседям клетки, смотри те, которые еще не проверены, отправляю их на проверку
+/// </summary>
+/// <param name="task"></param>
+/// <param name="current_cell"></param>
+/// <returns></returns>
+int find_unvisited(bdd task, int current_cell);
+
+/// <summary>
+///     из i-ой клетки достает восприятие (percept)
+/// </summary>
+/// <param name="Enviroment"></param>
+/// <param name="current_cell"></param>
+/// <returns></returns>
+bdd ask_and_send_percept(vector<vector <Node>> Enviroment, int current_cell);
+
+/// <summary>
+///     проверяет клетку на безопасность
+/// </summary>
+/// <param name="task"></param>
+/// <param name="current_cell"></param>
+/// <returns></returns>
+int check_for_safety(bdd task, int current_cell);
+
+/// <summary>
+///     сочетает две функции: поиск соседей и проверку на безопасность
+/// </summary>
+/// <param name="task"></param>
+/// <param name="current_cell"></param>
+/// <returns></returns>
+int Enviroment(bdd task, int current_cell);
+
+/// <summary>
+/// 
+/// </summary>
+/// <param name="plan"> -- Стек содержащий последовательность действий для достижения цели </param>
+/// <param name="str_plan"> -- Стек содержащий последовательность действий для достижения цели в текстовой форме </param>
+/// <param name="relation"> -- Описание отношений перехода между узлами </param>
+/// <param name="first_state"> -- Узел из которого требуется построить путь (обычная вершина) </param>
+/// <param name="q"> -- Вектор обычных вершин (набор вершин в текущий момент времени) </param>
+/// <param name="qq"> -- Вектор штрифованных вершин (набор вершин в следующий момент времени) </param>
+/// <param name="wished_state"> -- Узел в который хочется прийти (штрихованная вершина) </param>
+/// <param name="answer"></param>
+/// <param name="visited"></param>
+/// <param name="direction"></param>
+/// <param name="actionsNext"> -- Описание действий для перемещения </param>
+/// <param name="directions"> -- Направления движения </param>
+void find_path(stack <bdd> &plan, stack <string> &str_plan,
+               bdd relation, bdd first_state, bdd* q, bdd* qq,
+               bdd wished_state, vector<int> answer, vector<bdd> visited, bdd& direction,
+               TimeDependentActions &actionsNext,
+               Directions &directions);
+
+/// <summary>
+/// 
+/// </summary>
+/// <param name="cell"></param>
+/// <param name="action"></param>
+/// <param name="direction"></param>
+/// <returns></returns>
+int move(int cell, string action, bdd& direction, Directions& dir);
 
 //переменные восприятия среды
 bdd Stench; // ощущение агентом 
@@ -46,11 +129,11 @@ bdd S[N]; //запах
 bdd W[N]; //вампус
 bdd G[N]; //золото
 
-// направления, куда смотрит агент, для символьных вычислений
-bdd n; // Север
-bdd e; // Запад
-bdd s; // Юг
-bdd w; // Восток
+//// направления, куда смотрит агент, для символьных вычислений
+//bdd n; // Север
+//bdd e; // Запад
+//bdd s; // Юг
+//bdd w; // Восток
 
 //переменные состояния среды, ЗАВИСЯЩИЕ ОТ ВРЕМЕНИ
 #pragma region Time-dependent environment state variables
@@ -132,12 +215,9 @@ stack <int> cells[N]; //стек для хранения предыдущей клетки
 bool flag = false;
 bool to_stop_recursion;
 
-stack <bdd> plan;
-stack <string> str_plan;
-
 int main()
 {
-    // Замечание. Сначала инициализируем статику, потом динамику
+    // Замечание. В программе сначала инициализируется статика, потом динамика
 
     // Инициализация Buddy
     int countvar = 0;             // Сквозной счетчик для bdd
@@ -173,8 +253,6 @@ int main()
         // для ям      N*2..N*3
         // для ветра   N*3..N*4
         // Для золота  N*4..N*5
-
-        // TODO можно объеденить в один цикл
 
         // для Вампуса
         for (int i = 0; i < N; i++)
@@ -297,6 +375,7 @@ int main()
     }
 
     // ПЕРЕМЕННЫЕ ДЛЯ СЛЕДУЮЩЕГО СОСТОЯНИЯ
+    TimeDependentActions actionsNext;
     {
         for (int i = 0; i < N; i++)
         {
@@ -337,23 +416,17 @@ int main()
         countvar++;
 
         //для действий (форвард, тёрнлефт, тёрнрайт)
-        Forward_next = bdd_ithvar(countvar);
-        countvar++;
+        actionsNext.Forward = bdd_ithvar(countvar++);
+        actionsNext.TurnLeft = bdd_ithvar(countvar++);
+        actionsNext.TurnRight = bdd_ithvar(countvar++);
 
-        TurnLeft_next = bdd_ithvar(countvar);
-        countvar++;
+        Grab_next = bdd_ithvar(countvar++);
+        Climb_next = bdd_ithvar(countvar++);
+        Shoot_next = bdd_ithvar(countvar++);
 
-        TurnRight_next = bdd_ithvar(countvar);
-        countvar++;
-
-        Grab_next = bdd_ithvar(countvar);
-        countvar++;
-
-        Climb_next = bdd_ithvar(countvar);
-        countvar++;
-
-        Shoot_next = bdd_ithvar(countvar);
-        countvar++;
+        actionsNext.Grab = Grab_next;
+        actionsNext.Climb = Climb_next;
+        actionsNext.Shoot = Shoot_next;
 
         //для состояний агента (золото, вылез ли из пещеры?)
 
@@ -532,24 +605,33 @@ int main()
 
     // СИМВОЛЬНЫЕ ВЫЧИСЛЕНИЯ
 
-    const int xSize = 12;
+    const int xSize = 12; // TODO размер массива правилен?
     bdd x[xSize];  // ???
     bdd q[16];  // нештрихованные
     bdd qq[16]; // штрихованные
 
-    // ???
+    // TODO это правильное выделение переменных?
     for (int i = 0; i < xSize; i++)
     {
         x[i] = bdd_ithvar(i);
     }
 
+    // Элементам массива q и qq присваиваются следующие значения
+    // q[i]  = x[0] & .. & x[N_LOG - 1]
+    // qq[i] = x[N_LOG] & .. & x[2 * N_LOG - 1]
+    // Данные присвоения соответствуют следующему порядку
+    // q[0] = 0..00 <=> !x[0] & .. & !x[N_LOG - 2] & !x[N_LOG - 1]
+    // q[1] = 0..01 <=> !x[0] & .. & !x[N_LOG - 2] &  x[N_LOG - 1]
+    // q[2] = 0..10 <=> !x[0] & .. &  x[N_LOG - 2] & !x[N_LOG - 1]
+    // ...
+    // q[N] = ... (последовательность из 0 и 1, которая в двоичном коде является представлением числа N)
     for (int i = 0; i < N; ++i)
     {
         q[i] = bddtrue;
         qq[i] = bddtrue;
         for (int j = 0; j < N_LOG; ++j)
         {
-            if (((i >> (N_LOG - 1 - j)) & 1) == 1) // don't ask me why
+            if (((i >> (N_LOG - 1 - j)) & 1) == 1)
             {
                 q[i] &= x[j];
                 qq[i] &= x[j + N_LOG];
@@ -562,10 +644,13 @@ int main()
         }
     }
 
-    n = !x[8] & !x[9]; // 00
-    s = !x[8] & x[9];  // 01
-    e = x[8] & !x[9];  // 10
-    w = x[8] & x[9];   // 11
+    // направления, куда смотрит агент, для символьных вычислений
+    Directions dir;
+
+    dir.n = !x[8] & !x[9]; // 00
+    dir.s = !x[8] & x[9];  // 01
+    dir.e = x[8] & !x[9];  // 10
+    dir.w = x[8] & x[9];   // 11
 
     // Описание переходов на графе для символьных вычислений
     bdd R = bddfalse;
@@ -574,22 +659,22 @@ int main()
         // если ячейка не в крайнем левом столбце
         if (i % N_COLUMN != 0)
         {
-            R |= q[i] & w & qq[i - 1];
+            R |= q[i] & dir.w & qq[i - 1];
         }
         // если ячейка не в крайнем правом столбце
         if ((i + 1) % N_COLUMN != 0)
         {
-            R |= q[i] & e & qq[i + 1];
+            R |= q[i] & dir.e & qq[i + 1];
         }
         // если ячейка не на самой нижней строке
         if (i < N_COLUMN * (N_ROW - 1))
         {
-            R |= q[i] & s & qq[i + N_COLUMN];
+            R |= q[i] & dir.s & qq[i + N_COLUMN];
         }
         // если ячейка не на самой верхней строке
         if (i >= N_COLUMN)
         {
-            R |= q[i] & n & qq[i - N_COLUMN];
+            R |= q[i] & dir.n & qq[i - N_COLUMN];
         }
     }
 
@@ -609,115 +694,133 @@ int main()
 	bdd relation;
 	vector <bdd> visited = { qq[current_cell] };
 	vector <int> answer;
-	bdd direction = e;
+	bdd direction = dir.e;
+    stack <bdd> plan;
+    stack <string> str_plan;
 	stack <string> new_plan;
 	stack <int> previous_cell;
 
     // Засекаем время старта алгоритма
     auto start = std::chrono::high_resolution_clock::now();
 
-    cout << "Current cell is " << current_cell << endl;
     bool gold_flag = false;
-    do 
-    { 
-		bdd percept = ask_and_send_percept(real_cave2, current_cell);
-		if ((percept &= !G[current_cell]) == bddfalse)
-		{
-			gold_flag = true;
-			cout << "In cell " << current_cell << " is Gold! " << endl;
-			cout << endl;
-			cout << "Now agent is going back to the exit" << endl;
-			cout << endl;
-			bdd new_relation;
-			while (current_cell != 0)
-			{
-				int count = 0;
-				previous_cell.push(current_cell);
-				reverse_cells[current_cell] = true;
-				new_relation = R & q[current_cell];
-				vector<int> neighb = neighbourNodes(current_cell);
-				for (int i : neighb)
-				{
-					count++;
-					if (safe_cells[i] == true && reverse_cells[i] == false)
-					{
-						new_relation &= qq[i];
-						cell_to_go = i;
-						find_path(R, q[current_cell], q, qq, qq[cell_to_go], answer, visited, direction);
-						to_stop_recursion = false;
-						int size = str_plan.size();
-						for (int j = 0; j < size; j++)
-						{
-							new_plan.push(str_plan.top());
-							str_plan.pop();
-						}
+    // Ходим по полю, пока не найдём золото и не вернёмся назад
+    while (gold_flag != true) // || current_cell != 0
+    {
+        cout << "Current cell is " << current_cell << endl;
 
-						for (int j = 0; j < size; j++)
-						{
-							if (!new_plan.empty())
-							{
-								string action = new_plan.top();
-								current_cell = move(current_cell, action, direction);
-								cout << "action done by an agent - " << action << endl;
-								new_plan.pop();
-							}
-						}
-						current_cell = cell_to_go;
-						cout << "Current cell is " << current_cell << endl;
-						count--;
-						break;
-					}
-				}
-				if (neighb.size() == count)
-				{
-					current_cell = previous_cell.top();
-					previous_cell.pop();
-					current_cell = previous_cell.top();
-					previous_cell.pop();
-					cout << "Current cell is " << current_cell << endl;
-				}
-			}
-			break;
-		}
+        bdd percept = ask_and_send_percept(real_cave2, current_cell);
+        // Если мы на клетке с золотом
+        if ((percept &= !G[current_cell]) == bddfalse)
+        {
+            cout << "" << endl;
+            cout << "In cell " << current_cell << " is Gold! " << endl;
+            cout << "Now agent is going back to the exit" << endl;
+            cout << "" << endl;
 
-		task &= percept;
+            gold_flag = true;
+            bdd new_relation;
+            // пока не вернулись назад
+            while (current_cell != 0)
+            {
+                int cellToGo = current_cell;
+                previous_cell.push(current_cell);
+                reverse_cells[current_cell] = true;
+                new_relation = R & q[current_cell];
 
-		cell_to_go = Enviroment(task, current_cell);
 
-		bdd current_relation = R & q[current_cell];
+                vector<int> neighb = neighbourNodes(current_cell);
+                for (int i : neighbourNodes(current_cell))
+                {
+                    // если мы можем идти в соседнюю клетку
+                    if (safe_cells[i] == true && reverse_cells[i] == false)
+                    {
+                        cellToGo = i;
+                    }
+                }
 
-		current_relation &= qq[cell_to_go];
+                // если нам некуда идти (мы в тупике), возвращаемся назад
+                if (cellToGo == current_cell)
+                {
+                    // почему такая последовательность ??? (как это вообще работает?)
+                    current_cell = previous_cell.top();
+                    previous_cell.pop();
+                    current_cell = previous_cell.top();
+                    previous_cell.pop();
+                    cout << "Current cell is " << current_cell << endl;
+                }
+                // Иначе меняем текущее положение на новое
+                else
+                {
+                    new_relation &= qq[cellToGo];
 
-		relation |= current_relation;
+                    find_path(plan, str_plan, R, q[current_cell], q, qq, qq[cellToGo], answer, visited, direction, actionsNext, dir);
+                    to_stop_recursion = false;
+                    int size = str_plan.size();
+                    for (int j = 0; j < size; j++)
+                    {
+                        new_plan.push(str_plan.top());
+                        str_plan.pop();
+                    }
 
-		find_path(current_relation, q[current_cell], q, qq, qq[cell_to_go], answer, visited, direction);
-		to_stop_recursion = false;
-		int size = str_plan.size();
-		for (int i = 0; i < size; i++)
-		{
-			new_plan.push(str_plan.top());
-			str_plan.pop();
-		}
+                    for (int j = 0; j < size; j++)
+                    {
+                        if (!new_plan.empty())
+                        {
+                            string action = new_plan.top();
+                            current_cell = move(current_cell, action, direction, dir);
+                            cout << "action done by an agent - " << action << endl;
+                            new_plan.pop();
+                        }
+                    }
 
-		for (int i = 0; i < size; i++)
-		{
-			if (!new_plan.empty())
-			{
-				string action = new_plan.top();
-				current_cell = move(current_cell, action, direction);
-				cout << "action done by an agent - " << action << endl;
-				new_plan.pop();
-			}
-		}
-		cells_visited_by_agent.push_back(current_cell);
-		cout << "Current cell is " << current_cell << endl;
+                    current_cell = cellToGo;
+                    cout << "Current cell is " << current_cell << endl;
+                }
+            }
+        }
+        // Если мы всё ещё в поисках золота
+        else
+        {
+            task &= percept;
 
-	} while (gold_flag != true);
+            cell_to_go = Enviroment(task, current_cell);
+
+            bdd current_relation = R & q[current_cell];
+
+            current_relation &= qq[cell_to_go];
+
+            relation |= current_relation;
+
+            find_path(plan, str_plan, current_relation, q[current_cell], q, qq, qq[cell_to_go], answer, visited, direction, actionsNext, dir);
+            to_stop_recursion = false;
+            int size = str_plan.size();
+            for (int i = 0; i < size; i++)
+            {
+                new_plan.push(str_plan.top());
+                str_plan.pop();
+            }
+
+            for (int i = 0; i < size; i++)
+            {
+                if (!new_plan.empty())
+                {
+                    string action = new_plan.top();
+                    current_cell = move(current_cell, action, direction, dir);
+                    cout << "action done by an agent - " << action << endl;
+                    new_plan.pop();
+                }
+            }
+            cells_visited_by_agent.push_back(current_cell);
+            cout << "Current cell is " << current_cell << endl;
+        }
+    }
 
     // Время работы алгоритма
-	auto diff = std::chrono::high_resolution_clock::now() - start; 
-	auto nsec = std::chrono::duration_cast<std::chrono::nanoseconds>(diff);
-	cout << "It took: " << nsec.count() << " nanoseconds" << endl;
+    auto diff = std::chrono::high_resolution_clock::now() - start; 
+    auto nsec = std::chrono::duration_cast<std::chrono::nanoseconds>(diff);
+    cout << "" << endl;
+    cout << "Calculations took: " << nsec.count() << " nanoseconds" << endl;
 
     // Завершение
     bdd_done();
@@ -821,14 +924,6 @@ bdd ask_and_send_percept(vector<vector<Node>> Enviroment, int current_cell) // в
                 percept &= !B[current_cell] & !S[current_cell] & !G[current_cell];
                 break;
             }
-            //if (Enviroment[current_cell][i] == 22)
-            //    percept &= S[current_cell];
-            //else if (Enviroment[current_cell][i] == 33)
-            //    percept &= B[current_cell];
-            //else if (Enviroment[current_cell][i] == 4)
-            //    percept &= G[current_cell];
-            //else percept &= !B[current_cell] & !S[current_cell] & !G[current_cell];
-
         }
         return percept;
     }
@@ -885,52 +980,59 @@ int Enviroment(bdd task, int current_cell)
 	}
 }
 
-int move(int cell, string action, bdd &direction) //функция для передвижения
+int move(int cell, string action, bdd &direction, Directions &dir) //функция для передвижения
 {
-	if (direction == n)
+	if (direction == dir.n)
 	{
 		if (action == "forward")
 			cell = cell - N_ROW;
 		else if (action == "turnLeft")
-			direction = w;
+			direction = dir.w;
 		else if (action == "turnRight")
-			direction = e;
+			direction = dir.e;
 	}
-	else if (direction == s)
+	else if (direction == dir.s)
 	{
 		if (action == "forward")
 			cell = cell + N_ROW;
 		else if (action == "turnLeft")
-			direction = e;
+			direction = dir.e;
 		else if (action == "turnRight")
-			direction = w;
+			direction = dir.w;
 	}
-	else if (direction == e)
+	else if (direction == dir.e)
 	{
 		if (action == "forward")
 			cell = cell + 1;
 		else if (action == "turnLeft")
-			direction = n;
+			direction = dir.n;
 		else if (action == "turnRight")
-			direction = s;
+			direction = dir.s;
 	}
-	else if (direction == w)
+	else if (direction == dir.w)
 	{
 		if (action == "forward")
 			cell = cell -1;
 		else if (action == "turnLeft")
-			direction = s;
+			direction = dir.s;
 		else if (action == "turnRight")
-			direction = n;
+			direction = dir.n;
 	}
 	return cell;
 }
 
-void find_path(bdd relation, bdd first_state, bdd* q, bdd* qq, bdd wished_state, vector<int> answer, vector<bdd> visited, bdd &direction)
+// Увы, я не могу понять, какова цель этой функции 
+// (есть только стойкое ощущение, что функция просто ищет последовательность действий для перехода из одной клетки в соседнюю)
+void find_path(stack <bdd>& plan, stack <string>& str_plan,
+               bdd relation, bdd first_state, bdd* q, bdd* qq,
+               bdd wished_state, vector<int> answer, vector<bdd> visited, bdd& direction,
+               TimeDependentActions& actionsNext,
+               Directions& directions)
 {
-	bool flag = false;
-	bool dostijima = false;
-	int dir;
+    bool flag = false;
+    bool dostijima = false;
+    int dir;
+
 	while (!flag && !dostijima)
 	{
 		bdd X_pr = first_state;
@@ -941,20 +1043,23 @@ void find_path(bdd relation, bdd first_state, bdd* q, bdd* qq, bdd wished_state,
 
 			if (to_stop_recursion == true)
 				break;
+
+            // если мы можем осуществить переход за один шаг в конечную вершину ???
 			if ((X_R & qq[i]) != bddfalse && qq[i] == wished_state)
 			{
 				answer.push_back(i);
 				dostijima = true;
 				flag = true;
 				visited.push_back(qq[i]);
-				if (direction == n)
+				if (direction == directions.n)
 					dir = 1;
-				else if (direction == s)
+				else if (direction == directions.s)
 					dir = 2;
-				else if (direction == e)
+				else if (direction == directions.e)
 					dir = 3;
-				else if (direction == w)
+				else if (direction == directions.w)
 					dir = 4;
+
 				switch (dir)
 				{
 				case 1: //север
@@ -967,7 +1072,7 @@ void find_path(bdd relation, bdd first_state, bdd* q, bdd* qq, bdd wished_state,
 
 					else if ((X_R & qq[i] & direction) == bddfalse)
 					{
-						if ((X_R & qq[i] & e) != bddfalse)
+						if ((X_R & qq[i] & directions.e) != bddfalse)
 						{
 							str_plan.push("turnRight");
 							plan.push(TurnRight_next);
@@ -975,7 +1080,7 @@ void find_path(bdd relation, bdd first_state, bdd* q, bdd* qq, bdd wished_state,
 							plan.push(Forward_next);
 							//direction = e;
 						}
-						else if ((X_R & qq[i] & w) != bddfalse)
+						else if ((X_R & qq[i] & directions.w) != bddfalse)
 						{
 							str_plan.push("turnLeft");
 							plan.push(TurnLeft_next);
@@ -983,7 +1088,7 @@ void find_path(bdd relation, bdd first_state, bdd* q, bdd* qq, bdd wished_state,
 							plan.push(Forward_next);
 							//direction = w;
 						}
-						else if ((X_R & qq[i] & s) != bddfalse)
+						else if ((X_R & qq[i] & directions.s) != bddfalse)
 						{
 							str_plan.push("turnLeft");
 							plan.push(TurnLeft_next);
@@ -1004,7 +1109,7 @@ void find_path(bdd relation, bdd first_state, bdd* q, bdd* qq, bdd wished_state,
 					}
 					else if ((X_R & qq[i] & direction) == bddfalse)
 					{
-						if ((X_R & qq[i] & e) != bddfalse)
+						if ((X_R & qq[i] & directions.e) != bddfalse)
 						{
 							str_plan.push("turnLeft");
 							plan.push(TurnLeft_next);
@@ -1012,7 +1117,7 @@ void find_path(bdd relation, bdd first_state, bdd* q, bdd* qq, bdd wished_state,
 							plan.push(Forward_next);
 							//direction = e;
 						}
-						else if ((X_R & qq[i] & w) != bddfalse)
+						else if ((X_R & qq[i] & directions.w) != bddfalse)
 						{
 							str_plan.push("turnRight");
 							plan.push(TurnRight_next);
@@ -1020,7 +1125,7 @@ void find_path(bdd relation, bdd first_state, bdd* q, bdd* qq, bdd wished_state,
 							plan.push(Forward_next);
 							//direction = w;
 						}
-						else if ((X_R & qq[i] & n) != bddfalse)
+						else if ((X_R & qq[i] & directions.n) != bddfalse)
 						{
 							str_plan.push("turnLeft");
 							plan.push(TurnLeft_next);
@@ -1041,7 +1146,7 @@ void find_path(bdd relation, bdd first_state, bdd* q, bdd* qq, bdd wished_state,
 					}
 					else if ((X_R & qq[i] & direction) == bddfalse)
 					{
-						if ((X_R & qq[i] & s) != bddfalse)
+						if ((X_R & qq[i] & directions.s) != bddfalse)
 						{
 							str_plan.push("turnRight");
 							plan.push(TurnRight_next);
@@ -1049,7 +1154,7 @@ void find_path(bdd relation, bdd first_state, bdd* q, bdd* qq, bdd wished_state,
 							plan.push(Forward_next);
 							//direction = s;
 						}
-						else if ((X_R & qq[i] & n) != bddfalse)
+						else if ((X_R & qq[i] & directions.n) != bddfalse)
 						{
 							str_plan.push("turnLeft");
 							plan.push(TurnLeft_next);
@@ -1057,7 +1162,7 @@ void find_path(bdd relation, bdd first_state, bdd* q, bdd* qq, bdd wished_state,
 							plan.push(Forward_next);
 							//direction = n;
 						}
-						else if ((X_R & qq[i] & w) != bddfalse)
+						else if ((X_R & qq[i] & directions.w) != bddfalse)
 						{
 							str_plan.push("turnLeft");
 							plan.push(TurnLeft_next);
@@ -1078,7 +1183,7 @@ void find_path(bdd relation, bdd first_state, bdd* q, bdd* qq, bdd wished_state,
 					}
 					else if ((X_R & qq[i] & direction) == bddfalse)
 					{
-						if ((X_R & qq[i] & s) != bddfalse)
+						if ((X_R & qq[i] & directions.s) != bddfalse)
 						{
 							str_plan.push("turnLeft");
 							plan.push(TurnLeft_next);
@@ -1086,7 +1191,7 @@ void find_path(bdd relation, bdd first_state, bdd* q, bdd* qq, bdd wished_state,
 							plan.push(Forward_next);
 							//direction = s;
 						}
-						else if ((X_R & qq[i] & n) != bddfalse)
+						else if ((X_R & qq[i] & directions.n) != bddfalse)
 						{
 							str_plan.push("turnRight");
 							plan.push(TurnRight_next);
@@ -1094,7 +1199,7 @@ void find_path(bdd relation, bdd first_state, bdd* q, bdd* qq, bdd wished_state,
 							plan.push(Forward_next);
 							//direction = n;
 						}
-						else if ((X_R & qq[i] & e) != bddfalse)
+						else if ((X_R & qq[i] & directions.e) != bddfalse)
 						{
 							str_plan.push("turnLeft");
 							plan.push(TurnLeft_next);
@@ -1118,7 +1223,9 @@ void find_path(bdd relation, bdd first_state, bdd* q, bdd* qq, bdd wished_state,
 				//cout << endl;
 				//break;
 			}
-			else if ((X_R & qq[i] & first_state) != bddfalse)
+            // иначе если ???
+            // у нас в X_R уже включена first_state
+            else if ((X_R & qq[i] & first_state) != bddfalse)
 			{
 				int j = 0;
 				bool cflag = false;
@@ -1132,13 +1239,13 @@ void find_path(bdd relation, bdd first_state, bdd* q, bdd* qq, bdd wished_state,
 				}
 				if (!cflag)
 				{
-					if (direction == n)
+					if (direction == directions.n)
 						dir = 1;
-					else if (direction == s)
+					else if (direction == directions.s)
 						dir = 2;
-					else if (direction == e)
+					else if (direction == directions.e)
 						dir = 3;
-					else if (direction == w)
+					else if (direction == directions.w)
 						dir = 4;
 					switch (dir)
 					{
@@ -1152,7 +1259,7 @@ void find_path(bdd relation, bdd first_state, bdd* q, bdd* qq, bdd wished_state,
 
 						else if ((X_R & qq[i] & direction) == bddfalse)
 						{
-							if ((X_R & qq[i] & e) != bddfalse)
+							if ((X_R & qq[i] & directions.e) != bddfalse)
 							{
 								str_plan.push("turnRight");
 								plan.push(TurnRight_next);
@@ -1160,7 +1267,7 @@ void find_path(bdd relation, bdd first_state, bdd* q, bdd* qq, bdd wished_state,
 								plan.push(Forward_next);
 								//direction = e;
 							}
-							else if ((X_R & qq[i] & w) != bddfalse)
+							else if ((X_R & qq[i] & directions.w) != bddfalse)
 							{
 								str_plan.push("turnLeft");
 								plan.push(TurnLeft_next);
@@ -1168,7 +1275,7 @@ void find_path(bdd relation, bdd first_state, bdd* q, bdd* qq, bdd wished_state,
 								plan.push(Forward_next);
 								//direction = w;
 							}
-							else if ((X_R & qq[i] & s) != bddfalse)
+							else if ((X_R & qq[i] & directions.s) != bddfalse)
 							{
 								str_plan.push("turnLeft");
 								plan.push(TurnLeft_next);
@@ -1189,7 +1296,7 @@ void find_path(bdd relation, bdd first_state, bdd* q, bdd* qq, bdd wished_state,
 						}
 						else if ((X_R & qq[i] & direction) == bddfalse)
 						{
-							if ((X_R & qq[i] & e) != bddfalse)
+							if ((X_R & qq[i] & directions.e) != bddfalse)
 							{
 								str_plan.push("turnLeft");
 								plan.push(TurnLeft_next);
@@ -1197,7 +1304,7 @@ void find_path(bdd relation, bdd first_state, bdd* q, bdd* qq, bdd wished_state,
 								plan.push(Forward_next);
 								//direction = e;
 							}
-							else if ((X_R & qq[i] & w) != bddfalse)
+							else if ((X_R & qq[i] & directions.w) != bddfalse)
 							{
 								str_plan.push("turnRight");
 								plan.push(TurnRight_next);
@@ -1205,7 +1312,7 @@ void find_path(bdd relation, bdd first_state, bdd* q, bdd* qq, bdd wished_state,
 								plan.push(Forward_next);
 								//direction = w;
 							}
-							else if ((X_R & qq[i] & n) != bddfalse)
+							else if ((X_R & qq[i] & directions.n) != bddfalse)
 							{
 								str_plan.push("turnLeft");
 								plan.push(TurnLeft_next);
@@ -1226,7 +1333,7 @@ void find_path(bdd relation, bdd first_state, bdd* q, bdd* qq, bdd wished_state,
 						}
 						else if ((X_R & qq[i] & direction) == bddfalse)
 						{
-							if ((X_R & qq[i] & s) != bddfalse)
+							if ((X_R & qq[i] & directions.s) != bddfalse)
 							{
 								str_plan.push("turnRight");
 								plan.push(TurnRight_next);
@@ -1234,7 +1341,7 @@ void find_path(bdd relation, bdd first_state, bdd* q, bdd* qq, bdd wished_state,
 								plan.push(Forward_next);
 								//direction = s;
 							}
-							else if ((X_R & qq[i] & n) != bddfalse)
+							else if ((X_R & qq[i] & directions.n) != bddfalse)
 							{
 								str_plan.push("turnLeft");
 								plan.push(TurnLeft_next);
@@ -1242,7 +1349,7 @@ void find_path(bdd relation, bdd first_state, bdd* q, bdd* qq, bdd wished_state,
 								plan.push(Forward_next);
 								//direction = n;
 							}
-							else if ((X_R & qq[i] & w) != bddfalse)
+							else if ((X_R & qq[i] & directions.w) != bddfalse)
 							{
 								str_plan.push("turnLeft");
 								plan.push(TurnLeft_next);
@@ -1263,7 +1370,7 @@ void find_path(bdd relation, bdd first_state, bdd* q, bdd* qq, bdd wished_state,
 						}
 						else if ((X_R & qq[i] & direction) == bddfalse)
 						{
-							if ((X_R & qq[i] & s) != bddfalse)
+							if ((X_R & qq[i] & directions.s) != bddfalse)
 							{
 								str_plan.push("turnLeft");
 								plan.push(TurnLeft_next);
@@ -1271,7 +1378,7 @@ void find_path(bdd relation, bdd first_state, bdd* q, bdd* qq, bdd wished_state,
 								plan.push(Forward_next);
 								//direction = s;
 							}
-							else if ((X_R & qq[i] & n) != bddfalse)
+							else if ((X_R & qq[i] & directions.n) != bddfalse)
 							{
 								str_plan.push("turnRight");
 								plan.push(TurnRight_next);
@@ -1279,7 +1386,7 @@ void find_path(bdd relation, bdd first_state, bdd* q, bdd* qq, bdd wished_state,
 								plan.push(Forward_next);
 								//direction = n;
 							}
-							else if ((X_R & qq[i] & e) != bddfalse)
+							else if ((X_R & qq[i] & directions.e) != bddfalse)
 							{
 								str_plan.push("turnLeft");
 								plan.push(TurnLeft_next);
@@ -1310,7 +1417,7 @@ void find_path(bdd relation, bdd first_state, bdd* q, bdd* qq, bdd wished_state,
 							{
 								visited.push_back(qq[i]);
 								answer.push_back(i);
-								find_path(relation, q[i], q, qq, wished_state, answer, visited, direction);
+								find_path(plan, str_plan, relation, q[i], q, qq, wished_state, answer, visited, direction, actionsNext, directions);
 								break;
 							}
 						}
@@ -1318,12 +1425,16 @@ void find_path(bdd relation, bdd first_state, bdd* q, bdd* qq, bdd wished_state,
 				}
 			}
 		}
+
 		if (X_pr == first_state)
 		{
 			flag = true;
 			to_stop_recursion = true;
-		}
-		else X_pr = first_state;
-	}
+        }
+        else
+        {
+            X_pr = first_state;
+        }
+    }
 }
 
