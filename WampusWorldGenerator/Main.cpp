@@ -10,6 +10,15 @@ typedef unsigned int uint;
 
 using namespace std;
 
+/// <summary>
+///     ѕроверка на наличие свойства в узле
+/// </summary>
+/// <param name="map"> -- карта </param>
+/// <param name="cell"> -- номер €чейки дл€ проверки </param>
+/// <param name="attribute"> -- название признака дл€ проверки </param>
+/// <returns>
+///     true  -- если признак уже есть; || false -- признак отсутствует
+/// </returns>
 bool isAttributeExist(vector<vector<Node>>& map, int cell, Node attribute)
 {
     for (Node attr : map[cell])
@@ -22,6 +31,7 @@ bool isAttributeExist(vector<vector<Node>>& map, int cell, Node attribute)
 
     return false;
 }
+
 
 void addNodeToMap(vector<vector<Node>> &map, int cell, Node central, Node child, int nRows, int nColums)
 {
@@ -42,12 +52,12 @@ void addNodeToMap(vector<vector<Node>> &map, int cell, Node central, Node child,
             neighbours.push_back(cell + 1);
         }
         // если €чейка не на самой нижней строке
-        if (cell < N_COLUMN * (nRows - 1))
+        if (cell < nColums * (nRows - 1))
         {
             neighbours.push_back(cell + nColums);
         }
         // если €чейка не на самой верхней строке
-        if (cell >= N_COLUMN)
+        if (cell >= nColums)
         {
             neighbours.push_back(cell - nColums);
         }
@@ -68,7 +78,6 @@ int main()
 
     while (!programEnd)
     {
-
         int nRows;     // ƒлина пол€
         int nColums;   // Ўирина пол€
         int n;         //  оличество узлов
@@ -126,7 +135,7 @@ int main()
                 addNodeToMap(map, occupiedNodes[j], Node::PIT, Node::BREEZE, nRows, nColums);
             }
             addNodeToMap(map, occupiedNodes[pitAmount], Node::GOLD, Node::NONE, nRows, nColums);
-            addNodeToMap(map, occupiedNodes[pitAmount + 1], Node::PIT, Node::BREEZE, nRows, nColums);
+            addNodeToMap(map, occupiedNodes[pitAmount + 1], Node::WUMPUS, Node::STENCH, nRows, nColums);
             for (int j = 0; j < n; ++j)
             {
                 if (map[j].size() == 0)
@@ -163,11 +172,12 @@ int main()
             cin >> c;
         }
 
-        if (c == 'n')
+        if (c == 'y')
         {
-            programEnd = false;
+            programEnd = true;
         }
     }
+    cout << "Program finishes" << endl;
 
     return 0;
 }
