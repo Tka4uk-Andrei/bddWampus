@@ -64,91 +64,110 @@ void addNodeToMap(vector<vector<Node>> &map, int cell, Node central, Node child,
 
 int main()
 {
-    int nRows;     // Длина поля
-    int nColums;   // Ширина поля
-    int n;         // Количество узлов
-    int pitAmount; // Количество ям в поле
-    int mapAmount; // Количество генерируемых карт
+    bool programEnd = false;
 
-    cout << "Enter field size: colums and rows (or width and height)" << endl;
-    cin >> nRows >> nColums;
-    n = nRows * nColums;
-
-    cout << "Enter amount of pits" << endl;
-    cin >> pitAmount;
-
-    cout << "Enter amount of maps" << endl;
-    cin >> mapAmount;
-
-    // TODO добавить проверки полей на возможность создания
-    // Количество узлов не превышает RAND_MAX, количество ям меньше количества узлов на 3
-
-    //srand(time(0));
-    srand(5);
-    for (int i = 0; i < mapAmount; ++i)
+    while (!programEnd)
     {
-        cout << "Generating map " << setw(4) << i + 1 << " of " << setw(4) << mapAmount << "\r";
 
-        vector<int> occupiedNodes; // узлы которые могут быть заняты ямами и золотом и вампусом. Золото и вампус это последние два значения массива
+        int nRows;     // Длина поля
+        int nColums;   // Ширина поля
+        int n;         // Количество узлов
+        int pitAmount; // Количество ям в поле
+        int mapAmount; // Количество генерируемых карт
 
-        // формируем узлы, которые будут помечены как ямы, золото и вампус
-        int generatedCount = 0; // количество сгенерированных функцией rand() занятых узлов
-        while (generatedCount != pitAmount + 2) // добавляем 2 т.к. надо учесть клетку с золотом, вампусом
+        cout << "Enter field size: colums and rows (or width and height)" << endl;
+        cin >> nRows >> nColums;
+        n = nRows * nColums;
+
+        cout << "Enter amount of pits" << endl;
+        cin >> pitAmount;
+
+        cout << "Enter amount of maps" << endl;
+        cin >> mapAmount;
+
+        // TODO добавить проверки полей на возможность создания
+        // Количество узлов не превышает RAND_MAX, количество ям меньше количества узлов на 3
+
+        srand(time(0));
+        for (int i = 0; i < mapAmount; ++i)
         {
-            int newPitNode = 1 + rand() % (n - 1);
+            cout << "Generating map " << setw(4) << i + 1 << " of " << setw(4) << mapAmount << "\r";
 
-            // проверяем что узел уже не был добавлен
-            bool isInList = false;
-            for (int node : occupiedNodes)
+            vector<int> occupiedNodes; // узлы которые могут быть заняты ямами и золотом и вампусом. Золото и вампус это последние два значения массива
+
+            // формируем узлы, которые будут помечены как ямы, золото и вампус
+            int generatedCount = 0; // количество сгенерированных функцией rand() занятых узлов
+            while (generatedCount != pitAmount + 2) // добавляем 2 т.к. надо учесть клетку с золотом, вампусом
             {
-                if (node == newPitNode)
+                int newPitNode = 1 + rand() % (n - 1);
+
+                // проверяем что узел уже не был добавлен
+                bool isInList = false;
+                for (int node : occupiedNodes)
                 {
-                    isInList = true;
+                    if (node == newPitNode)
+                    {
+                        isInList = true;
+                    }
+                }
+
+                if (!isInList)
+                {
+                    occupiedNodes.push_back(newPitNode);
+                    ++generatedCount;
                 }
             }
-            
-            if (!isInList)
+
+            // Формируем карту
+            vector<vector<Node>>  map(n);  // создаём пустую карту
+            map[0].push_back(Node::AGENT);
+            for (int j = 0; j < pitAmount; ++j)
             {
-                occupiedNodes.push_back(newPitNode);
-                ++generatedCount;
+                addNodeToMap(map, occupiedNodes[j], Node::PIT, Node::BREEZE, nRows, nColums);
             }
+            addNodeToMap(map, occupiedNodes[pitAmount], Node::GOLD, Node::NONE, nRows, nColums);
+            addNodeToMap(map, occupiedNodes[pitAmount + 1], Node::PIT, Node::BREEZE, nRows, nColums);
+            for (int j = 0; j < n; ++j)
+            {
+                if (map[j].size() == 0)
+                {
+                    map[j].push_back(Node::NONE);
+                }
+            }
+
+            // печатаем результат в файл
+            ofstream out;
+            stringstream fileName;
+            fileName << "map_" << i << ".txt";
+            out.open(fileName.str());
+            out << nColums << " " << nRows;
+            for (int j = 0; j < n; ++j)
+            {
+                out << "\n";
+                for (Node node : map[j])
+                {
+                    out << static_cast<int>(node) << " ";
+                }
+            }
+            out << endl;
+            out.close();
+        }
+        cout << endl;
+
+        char c;
+        cout << "Generate new set (y/n)? ";
+        cin >> c;
+        while (c != 'y' && c != 'n')
+        {
+            cout << "Wrong input type \'y\' (yes) or \'n\' (no) ";
+            cin >> c;
         }
 
-        // Формируем карту
-        vector<vector<Node>>  map(n);  // создаём пустую карту
-        map[0].push_back(Node::AGENT);
-        for (int j = 0; j < pitAmount; ++j) 
+        if (c == 'n')
         {
-            addNodeToMap(map, occupiedNodes[j], Node::PIT, Node::BREEZE, nRows, nColums);
+            programEnd = false;
         }
-        addNodeToMap(map, occupiedNodes[pitAmount], Node::GOLD, Node::NONE, nRows, nColums);
-        addNodeToMap(map, occupiedNodes[pitAmount + 1], Node::PIT, Node::BREEZE, nRows, nColums);
-        for (int j = 0; j < n; ++j)
-        {
-            if (map[j].size() == 0)
-            {
-                map[j].push_back(Node::NONE);
-            }
-        }
-
-        // печатаем результат в файл
-        ofstream out;
-        stringstream fileName;
-        fileName << "map_" << i << ".txt";
-        out.open(fileName.str());
-        out << nColums << " " << nRows;
-        for (int j = 0; j < n; ++j)
-        {
-            out << "\n";
-            for (Node node : map[j])
-            {
-                out << static_cast<int>(node) << " ";
-            }
-        }
-        out << endl;
-        out.close();
     }
-    cout << endl;
 
     return 0;
 }
