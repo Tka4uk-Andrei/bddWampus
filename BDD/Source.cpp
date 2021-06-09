@@ -13,47 +13,40 @@
 #include <iomanip>
 
 #include "WorldMap.h"
-//#include "PathFinder.h"
+#include "Types.h"
+
+#include "PathFinder.h"
 
 using namespace std;
 
 ofstream out;
 
 //N_DEPEND_ON_CELL*N_COLUMN*N_ROW+N_NOT_DEPEND_ON_CELL+18
-#define N_DEPEND_ON_CELL 9
-#define N_NOT_DEPEND_ON_CELL 18
+//#define N_DEPEND_ON_CELL 9
+//#define N_NOT_DEPEND_ON_CELL 18
 
-#define N_FUNCTIONS_AT_CELL (3 + 14*4)
-#define N_FUNCTIONS_IN_FIELD (4 + 3*4) // до percept здесь было 4+3*2
-#define N_VAR 207
+//#define N_FUNCTIONS_AT_CELL (3 + 14*4)
+//#define N_FUNCTIONS_IN_FIELD (4 + 3*4) // до percept здесь было 4+3*2 (???)
 
-// Структура, описывающая переменные действия, ЗАВИСЯЩИЕ ОТ ВРЕМЕНИ
-struct TimeDependentActions
-{
-    bdd Forward;
-    bdd TurnRight;
-    bdd TurnLeft;
+constexpr bool USE_NEW_SEARCH = true;
 
-    bdd Grab;
-    bdd Climb;
-    bdd Shoot;
-};
 
-// Структура с направлениями, куда смотрит агент, для символьных вычислений
-struct Directions
-{
-    bdd n; // Север
-    bdd e; // Запад
-    bdd s; // Юг
-    bdd w; // Восток
-};
+// Log_2(4*4+2*4) = 5
+constexpr int NUMS_FOR_F_VAL = 5;
+constexpr int N_VAR = 207 + NUMS_FOR_F_VAL;
+
+Map mapInfo;
+
+// TODO добавить класс для работы с bdd. Через него должна происходить инициализация переменных.
+
+// TODO подумать над взаимодействием поворотов и напралений (может быть их можно как-то связать?)
 
 /// <summary>
 ///     Определение соседей относительно клетки cell
 /// </summary>
 /// <param name="cell"> Индекс ячейки поля, относительно которой определяются соседи </param>
 /// <returns> Вектор, который который содержит индексы соседей </returns>
-vector<int> neighbourNodes(int cell);
+//vector<int> neighbourNodes(int cell);
 
 /// <summary>
 ///     прохожусь по соседям клетки, смотри те, которые еще не проверены, отправляю их на проверку
@@ -215,8 +208,64 @@ stack <int> cells[N]; //стек для хранения предыдущей клетки
 bool flag = false;
 bool to_stop_recursion;
 
+lint runAgent(string filePath, bool isAstarUse);
+
 int main()
 {
+    constexpr uint TEST_COUNT = 15;
+    constexpr uint MAP_COUNT = 10;
+
+    string TEST_FOLDER = "../WampusWorldGenerator/";
+    string mapFolder = "4x4p5";
+    string testResFolder = "testResults/";
+
+    ofstream oldRes;
+    oldRes.open(testResFolder + "old_" + mapFolder + ".txt");
+
+    ofstream newRes;
+    newRes.open(testResFolder + "new_" + mapFolder + ".txt");
+
+    lint oldAlgoTimeSum = 0;
+    lint newAlgoTimeSum = 0;
+
+    // Цикл по картам одного 
+    for (uint i = 0; i < MAP_COUNT; ++i)
+    {
+        lint oldAlgoTimeSubSum = 0;
+        lint newAlgoTimeSubSum = 0;
+
+        // Запускаем насколько раз программу на одном и том же наборе данных
+        for (uint j = 0; j < TEST_COUNT; ++j)
+        {
+            stringstream mapName;
+            mapName << "map_" << i << ".txt";
+
+            oldAlgoTimeSubSum += runAgent(TEST_FOLDER + mapFolder + "/" + mapName.str(), false);
+            newAlgoTimeSubSum += runAgent(TEST_FOLDER + mapFolder + "/" + mapName.str(), true);
+        }
+
+        oldAlgoTimeSum += oldAlgoTimeSubSum / TEST_COUNT;
+        newAlgoTimeSum += newAlgoTimeSubSum / TEST_COUNT;
+
+        oldRes << oldAlgoTimeSubSum / TEST_COUNT << endl;
+        newRes << newAlgoTimeSubSum / TEST_COUNT << endl;
+    }
+
+    oldRes << oldAlgoTimeSum / MAP_COUNT << endl;
+    newRes << newAlgoTimeSum / MAP_COUNT << endl;
+
+    oldRes.close();
+    newRes.close();
+    cout << "<< Testing compleete! >>";
+
+    return 0;
+}
+
+lint runAgent(string filePath, bool isAstarUse)
+{
+    // Чтение карты
+    mapInfo = readMap(filePath);
+
     // Замечание. В программе сначала инициализируется статика, потом динамика
 
     // Инициализация Buddy
@@ -241,6 +290,8 @@ int main()
          << setw(3) << static_cast<int>(Node::GOLD)   << " - Gold\n"
          << setw(3) << static_cast<int>(Node::STENCH) << " - Stench\n"
          << setw(3) << static_cast<int>(Node::BREEZE) << " - Breeze" << endl;
+
+    printMap(mapInfo.cave, cout);
 
     bdd task = bddtrue; //Решение. Изначально true. Здесь будет находиться база
     bdd movements = bddtrue;
@@ -437,6 +488,27 @@ int main()
         countvar++;
     }
 
+    // Переменные для функции оценки
+    vector<bdd> fValues;
+    int nodesCout = mapInfo.nColumn * mapInfo.nRow;
+    int maxFval = mapInfo.nColumn * mapInfo.nRow + 2 * max(mapInfo.nColumn, mapInfo.nRow);
+    for (int i = 0; i < maxFval; ++i)
+    {
+        fValues.push_back(bddtrue);
+        for (int j = 0; j < NUMS_FOR_F_VAL; ++j)
+        {
+            if (((i >> j) & 1) == 1)
+            {
+                fValues[i] &= bdd_ithvar(countvar + j);
+            }
+            else
+            {
+                fValues[i] &= !bdd_ithvar(countvar + j);
+            }
+        }
+    }
+    countvar += NUMS_FOR_F_VAL;
+
     // НАЧАЛЬНАЯ БЗ АГЕНТА                                          ПРОВЕРЕНО
     task &= L[0];
     task &= V[0];
@@ -448,32 +520,32 @@ int main()
         task &= !V[i];
     }
 
-    task &= !P[0];
-    task &= !W[0];
+    task &= !P[0]; // в текущей клетке нет ямы
+    task &= !W[0]; // в текущей клетке нет Вампуса
 
-    task &= HaveArrow; //есть стрела
-    task &= WumpusAlive;
+    task &= HaveArrow;    // есть стрела
+    task &= WumpusAlive;  // Вампус жив
 
-    task &= East;
-    task &= !West;
-    task &= !South;
-    task &= !North;
+    task &= East;   // агент смотрит на восток
+    task &= !West;  // агент не смотрит на запад
+    task &= !South; // агент не смотрит на запад
+    task &= !North; // агент не смотрит на запад
 
-    task &= !Forward;
-    task &= !TurnLeft;
-    task &= !TurnRight;
+    task &= !Forward;   // агент не двигался вперёд
+    task &= !TurnLeft;  // агент не поворачивал налево
+    task &= !TurnRight; // агент не поворачивал направо
 
-    task &= !Grab;
-    task &= !Shoot;
-    task &= !Climb;
+    task &= !Grab;  // агент не брал золото
+    task &= !Shoot; // агент не стрелял
+    task &= !Climb; // агент не совершал действие, чтобы выбирался из пещеры
 
-    task &= !ClimbedOut;
-    task &= !HaveGold;
+    task &= !ClimbedOut; // агент не выбирался из пещеры
+    task &= !HaveGold;   // у агента нет золота
 
     // Формируем базу знаний не зависящую от времени
     for (int i = 0; i < N; i++)
     {
-        vector<int> neigbours = neighbourNodes(i);
+        vector<int> neigbours = neighbourNodes(i, mapInfo.nRow, mapInfo.nColumn);
 
         // формируем tempB, tempP, tempS.
         // отдельно формируем tempW
@@ -645,12 +717,12 @@ int main()
     }
 
     // направления, куда смотрит агент, для символьных вычислений
-    Directions dir;
+    Directions dirs;
 
-    dir.n = !x[8] & !x[9]; // 00
-    dir.s = !x[8] & x[9];  // 01
-    dir.e = x[8] & !x[9];  // 10
-    dir.w = x[8] & x[9];   // 11
+    dirs.n = !x[8] & !x[9]; // 00
+    dirs.s = !x[8] & x[9];  // 01
+    dirs.e = x[8] & !x[9];  // 10
+    dirs.w = x[8] & x[9];   // 11
 
     // Описание переходов на графе для символьных вычислений
     bdd R = bddfalse;
@@ -659,22 +731,22 @@ int main()
         // если ячейка не в крайнем левом столбце
         if (i % N_COLUMN != 0)
         {
-            R |= q[i] & dir.w & qq[i - 1];
+            R |= q[i] & dirs.w & qq[i - 1];
         }
         // если ячейка не в крайнем правом столбце
         if ((i + 1) % N_COLUMN != 0)
         {
-            R |= q[i] & dir.e & qq[i + 1];
+            R |= q[i] & dirs.e & qq[i + 1];
         }
         // если ячейка не на самой нижней строке
         if (i < N_COLUMN * (N_ROW - 1))
         {
-            R |= q[i] & dir.s & qq[i + N_COLUMN];
+            R |= q[i] & dirs.s & qq[i + N_COLUMN];
         }
         // если ячейка не на самой верхней строке
         if (i >= N_COLUMN)
         {
-            R |= q[i] & dir.n & qq[i - N_COLUMN];
+            R |= q[i] & dirs.n & qq[i - N_COLUMN];
         }
     }
 
@@ -689,12 +761,10 @@ int main()
         reverse_cells[i] = false;
     }
 
-    printMap(real_cave2, cout);
-
 	bdd relation;
 	vector <bdd> visited = { qq[current_cell] };
 	vector <int> answer;
-	bdd direction = dir.e;
+	bdd direction = dirs.e;
     stack <bdd> plan;
     stack <string> str_plan;
 	stack <string> new_plan;
@@ -704,12 +774,12 @@ int main()
     auto start = std::chrono::high_resolution_clock::now();
 
     bool gold_flag = false;
-    // Ходим по полю, пока не найдём золото и не вернёмся назад
-    while (gold_flag != true) // || current_cell != 0
+    // Ходим по полю, пока не найдём золото
+    while (gold_flag != true)
     {
         cout << "Current cell is " << current_cell << endl;
 
-        bdd percept = ask_and_send_percept(real_cave2, current_cell);
+        bdd percept = ask_and_send_percept(mapInfo.cave, current_cell);
         // Если мы на клетке с золотом
         if ((percept &= !G[current_cell]) == bddfalse)
         {
@@ -719,65 +789,6 @@ int main()
             cout << "" << endl;
 
             gold_flag = true;
-            bdd new_relation;
-            // пока не вернулись назад
-            while (current_cell != 0)
-            {
-                int cellToGo = current_cell;
-                previous_cell.push(current_cell);
-                reverse_cells[current_cell] = true;
-                new_relation = R & q[current_cell];
-
-
-                vector<int> neighb = neighbourNodes(current_cell);
-                for (int i : neighbourNodes(current_cell))
-                {
-                    // если мы можем идти в соседнюю клетку
-                    if (safe_cells[i] == true && reverse_cells[i] == false)
-                    {
-                        cellToGo = i;
-                    }
-                }
-
-                // если нам некуда идти (мы в тупике), возвращаемся назад
-                if (cellToGo == current_cell)
-                {
-                    // почему такая последовательность ??? (как это вообще работает?)
-                    current_cell = previous_cell.top();
-                    previous_cell.pop();
-                    current_cell = previous_cell.top();
-                    previous_cell.pop();
-                    cout << "Current cell is " << current_cell << endl;
-                }
-                // Иначе меняем текущее положение на новое
-                else
-                {
-                    new_relation &= qq[cellToGo];
-
-                    find_path(plan, str_plan, R, q[current_cell], q, qq, qq[cellToGo], answer, visited, direction, actionsNext, dir);
-                    to_stop_recursion = false;
-                    int size = str_plan.size();
-                    for (int j = 0; j < size; j++)
-                    {
-                        new_plan.push(str_plan.top());
-                        str_plan.pop();
-                    }
-
-                    for (int j = 0; j < size; j++)
-                    {
-                        if (!new_plan.empty())
-                        {
-                            string action = new_plan.top();
-                            current_cell = move(current_cell, action, direction, dir);
-                            cout << "action done by an agent - " << action << endl;
-                            new_plan.pop();
-                        }
-                    }
-
-                    current_cell = cellToGo;
-                    cout << "Current cell is " << current_cell << endl;
-                }
-            }
         }
         // Если мы всё ещё в поисках золота
         else
@@ -792,7 +803,7 @@ int main()
 
             relation |= current_relation;
 
-            find_path(plan, str_plan, current_relation, q[current_cell], q, qq, qq[cell_to_go], answer, visited, direction, actionsNext, dir);
+            find_path(plan, str_plan, current_relation, q[current_cell], q, qq, qq[cell_to_go], answer, visited, direction, actionsNext, dirs);
             to_stop_recursion = false;
             int size = str_plan.size();
             for (int i = 0; i < size; i++)
@@ -806,7 +817,7 @@ int main()
                 if (!new_plan.empty())
                 {
                     string action = new_plan.top();
-                    current_cell = move(current_cell, action, direction, dir);
+                    current_cell = move(current_cell, action, direction, dirs);
                     cout << "action done by an agent - " << action << endl;
                     new_plan.pop();
                 }
@@ -816,47 +827,98 @@ int main()
         }
     }
 
+    // Поиск обратного пути, после того как нашли золото
+
+    // Используем bddA*
+    if (isAstarUse)
+    {
+        Plan plan;
+        findPathAstar(plan, q[current_cell], R, q[0], safe_cells, q, qq, mapInfo.nRow, mapInfo.nColumn, fValues, direction, dirs, actionsNext);
+
+       for (int i = 0; i < plan.strPlan.size(); ++i)
+        {
+            string action = plan.strPlan[i];
+            current_cell = move(current_cell, action, direction, dirs);
+            cout << "Action done by an agent - " << action << '\n';
+            cout << "Current cell is " << current_cell << endl;
+        }
+    }
+    // Используем Сонину реализацию
+    else
+    {
+        bdd new_relation;
+        // пока не вернулись назад
+        while (current_cell != 0)
+        {
+            int cellToGo = current_cell;
+            previous_cell.push(current_cell);
+            reverse_cells[current_cell] = true;
+            new_relation = R & q[current_cell];
+
+
+            vector<int> neighb = neighbourNodes(current_cell, mapInfo.nRow, mapInfo.nColumn);
+            for (int i : neighbourNodes(current_cell, mapInfo.nRow, mapInfo.nColumn))
+            {
+                // если мы можем идти в соседнюю клетку
+                if (safe_cells[i] == true && reverse_cells[i] == false)
+                {
+                    cellToGo = i;
+                }
+            }
+
+            // если нам некуда идти (мы в тупике), возвращаемся назад
+            if (cellToGo == current_cell)
+            {
+                // почему такая последовательность ??? (как это вообще работает?)
+                current_cell = previous_cell.top();
+                previous_cell.pop();
+                current_cell = previous_cell.top();
+                previous_cell.pop();
+                cout << "Current cell is " << current_cell << endl;
+            }
+            // Иначе меняем текущее положение на новое
+            else
+            {
+                new_relation &= qq[cellToGo];
+
+                find_path(plan, str_plan, R, q[current_cell], q, qq, qq[cellToGo], answer, visited, direction, actionsNext, dirs);
+                to_stop_recursion = false;
+                int size = str_plan.size();
+                for (int j = 0; j < size; j++)
+                {
+                    new_plan.push(str_plan.top());
+                    str_plan.pop();
+                }
+
+                for (int j = 0; j < size; j++)
+                {
+                    if (!new_plan.empty())
+                    {
+                        string action = new_plan.top();
+                        current_cell = move(current_cell, action, direction, dirs);
+                        cout << "action done by an agent - " << action << endl;
+                        new_plan.pop();
+                    }
+                }
+
+                current_cell = cellToGo;
+                cout << "Current cell is " << current_cell << endl;
+            }
+        }
+    }
+
     // Время работы алгоритма
     auto diff = std::chrono::high_resolution_clock::now() - start; 
-    auto nsec = std::chrono::duration_cast<std::chrono::nanoseconds>(diff);
+    auto microsec = std::chrono::duration_cast<std::chrono::microseconds>(diff);
     cout << "" << endl;
-    cout << "Calculations took: " << nsec.count() << " nanoseconds" << endl;
+    cout << "Calculations took: " << microsec.count() << " microseconds" << endl;
 
     // Завершение
     bdd_done();
-    system("pause");
-    return 0;
+    return microsec.count();
 }
 
-// Определение соседей относительно клетки cell
-vector<int> neighbourNodes(int cell)
-{
-    vector <int> neighbours;
-
-    // если ячейка не в крайнем левом столбце
-    if (cell % N_COLUMN != 0)
-    {
-        neighbours.push_back(cell - 1);
-    }
-    // если ячейка не в крайнем правом столбце
-    if ((cell + 1) % N_COLUMN != 0)
-    {
-        neighbours.push_back(cell + 1);
-    }
-    // если ячейка не на самой нижней строке
-    if (cell < N_COLUMN * (N_ROW - 1))
-    {
-        neighbours.push_back(cell + N_COLUMN);
-    }
-    // если ячейка не на самой верхней строке
-    if (cell >= N_COLUMN)
-    {
-        neighbours.push_back(cell - N_COLUMN);
-    }
-
-    return neighbours;
-}
-
+//проверка клетки на безопасность
 int check_for_safety(bdd task, int current_cell) //проверка клетки на безопасность
 {
 	int cell_to_go_next;
@@ -886,9 +948,10 @@ int check_for_safety(bdd task, int current_cell) //проверка клетки на безопаснос
 	return cell_to_go_next;
 }
 
-int find_unvisited(bdd task, int current_cell) //прохожусь по соседям клетки, смотри те, которые еще не проверены, отправляю их на проверку
+//прохожусь по соседям клетки, смотри те, которые еще не проверены, отправляю их на проверку
+int find_unvisited(bdd task, int current_cell) 
 {
-	vector <int> neighbours_of_cell = neighbourNodes(current_cell);
+	vector <int> neighbours_of_cell = neighbourNodes(current_cell, mapInfo.nRow, mapInfo.nColumn);
 
 	for (int i = 0; i < neighbours_of_cell.size(); i++)
 	{
@@ -903,7 +966,8 @@ int find_unvisited(bdd task, int current_cell) //прохожусь по соседям клетки, см
 	return current_cell;
 }
 
-bdd ask_and_send_percept(vector<vector<Node>> Enviroment, int current_cell) // в текущей клетке беру percept
+// в текущей клетке беру percept
+bdd ask_and_send_percept(vector<vector<Node>> Enviroment, int current_cell) 
 {
     {
         bdd percept = bddtrue;
@@ -940,7 +1004,7 @@ int Enviroment(bdd task, int current_cell)
 
 	if (cell_to_check == current_cell)
 	{
-		vector<int> neighb = neighbourNodes(current_cell);
+		vector<int> neighb = neighbourNodes(current_cell, mapInfo.nRow, mapInfo.nColumn);
 		for (int i = 0; i < neighb.size(); i++)
 			if (checked_cells[neighb[i]] == true)
 			{
@@ -980,7 +1044,8 @@ int Enviroment(bdd task, int current_cell)
 	}
 }
 
-int move(int cell, string action, bdd &direction, Directions &dir) //функция для передвижения
+//функция для передвижения
+int move(int cell, string action, bdd &direction, Directions &dir)
 {
 	if (direction == dir.n)
 	{
@@ -1224,7 +1289,7 @@ void find_path(stack <bdd>& plan, stack <string>& str_plan,
 				//break;
 			}
             // иначе если ???
-            // у нас в X_R уже включена first_state
+            // у нас в X_R уже включена first_state !
             else if ((X_R & qq[i] & first_state) != bddfalse)
 			{
 				int j = 0;

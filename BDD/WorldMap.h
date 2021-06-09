@@ -1,11 +1,13 @@
 #pragma once
-#include <vector>
+
 #include <fstream>
+#include <sstream>
+#include <vector>
 #include <string>
 
-using namespace std;
+#include "Types.h"
 
-typedef unsigned int uint;
+using namespace std;
 
 // TODO add to namespace?
 
@@ -40,6 +42,7 @@ struct Map
     vector <vector<Node>> cave;
     uint nRow;
     uint nColumn;
+    uint n;
 };
 
 ////карта 4х4
@@ -49,25 +52,91 @@ struct Map
 //                                        {4, 22}, {2},  {22}, {0}};
 
 // карта 4х4
-vector<std::vector<Node>> real_cave2 = {{Node::AGENT},              {Node::NONE},   {Node::BREEZE}, {Node::PIT},
-                                        {Node::NONE},               {Node::BREEZE}, {Node::PIT},    {Node::BREEZE},
-                                        {Node::NONE},               {Node::STENCH}, {Node::BREEZE}, {Node::NONE},
-                                        {Node::GOLD, Node::STENCH}, {Node::WUMPUS}, {Node::STENCH}, {Node::NONE} };
+//vector<std::vector<Node>> real_cave2 = {{Node::AGENT},              {Node::NONE},   {Node::BREEZE}, {Node::PIT},
+//                                        {Node::NONE},               {Node::BREEZE}, {Node::PIT},    {Node::BREEZE},
+//                                        {Node::NONE},               {Node::STENCH}, {Node::BREEZE}, {Node::NONE},
+//                                        {Node::GOLD, Node::STENCH}, {Node::WUMPUS}, {Node::STENCH}, {Node::NONE} };
 
 //карта 3х3
 //vector<std::vector<Node>> real_cave3 = { {Node::Agent},  {Node::Breeze}, {Node::Pit},
 //                                         {Node::Breeze}, {Node::None},   {Node::Breeze, Node::Gold},
 //                                         {Node::Pit},    {Node::Breeze}, {Node::Pit, Node::Wumpus}};
 
-// Загрузка карты
-Map readMap()
+
+Node intToNode(int val)
+{
+    switch (val)
+    {
+        case static_cast<int>(Node::NONE):
+            return Node::NONE;
+
+        case static_cast<int>(Node::AGENT):
+            return Node::AGENT;
+
+        case static_cast<int>(Node::WUMPUS):
+            return Node::WUMPUS;
+
+        case static_cast<int>(Node::PIT):
+            return Node::PIT;
+
+        case static_cast<int>(Node::GOLD):
+            return Node::GOLD;
+
+        case static_cast<int>(Node::STENCH):
+            return Node::STENCH;
+
+        case static_cast<int>(Node::BREEZE):
+            return Node::BREEZE;
+
+        default:
+            return Node::NONE;
+    }
+}
+
+/// <summary>
+///     Загрузка карты мира Вампуса из файла
+/// </summary>
+/// <param name="path"> -- Путь к файлу, описывающий пещеру </param>
+/// <returns>
+///     Заполенная карта 
+/// </returns>
+Map readMap(string path)
 {
     Map map;
+
+    ifstream in;
+    in.open(path);
+
+    in >> map.nColumn >> map.nRow;
+    map.n = map.nColumn * map.nRow;
+    string tt;
+    getline(in, tt);
+    for (int i = 0; i < map.n; ++i)
+    {
+        string str;
+        getline(in, str);
+        stringstream sStr;
+        sStr << str;
+        
+        int val;
+        vector<Node> nodeDescription;
+        while (sStr >> val)
+        {
+            nodeDescription.push_back(intToNode(val));
+        }
+        map.cave.push_back(nodeDescription);
+    }
 
     return map;
 }
 
-// Вывод карты
+/// <summary>
+///     Вывод карты
+/// </summary>
+/// <param name="map"></param>
+/// <param name="out"></param>
+/// <param name="nColumn"></param>
+/// <param name="nRow"></param>
 void printMap(vector<vector<Node>> map, ostream& out = cout, uint nColumn = N_COLUMN, uint nRow = N_ROW)
 {
     bool gold_flag = false;
