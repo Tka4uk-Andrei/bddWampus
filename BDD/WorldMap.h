@@ -11,11 +11,6 @@ using namespace std;
 
 // TODO add to namespace?
 
-constexpr uint N_COLUMN = 4;                // Ширина поля
-constexpr uint N_ROW =    4;                // Длина поля
-constexpr uint N =        N_COLUMN * N_ROW; // Кол-во узлов
-constexpr uint N_LOG =    4;                // Количество двоичных переменных необходимых для кодирования N узлов
-
 // Описание ячеек игрового поля
 enum class Node : int
 {
@@ -137,7 +132,7 @@ Map readMap(string path)
 /// <param name="out"></param>
 /// <param name="nColumn"></param>
 /// <param name="nRow"></param>
-void printMap(vector<vector<Node>> map, ostream& out = cout, uint nColumn = N_COLUMN, uint nRow = N_ROW)
+void printMap(vector<vector<Node>> map, uint nColumn, uint nRow, ostream& out = cout)
 {
     bool gold_flag = false;
     int k1 = 0;

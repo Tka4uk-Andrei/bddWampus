@@ -476,7 +476,7 @@ uint hDist(int cur, int dest, int nColumn)
 /// <param name="nColumn"> -- Ширина поля </param>
 /// <param name="fValues"> -- Массив с преподсчитанными значениями функции оценки </param>
 /// <param name="iniDir"> -- начальное направление агента </param>
-void findPathAstar(Plan& plan, bdd startNode, bdd& relation, bdd endNode, vector<bool>& safeCells, bdd* q, bdd* qq, uint nRow, uint nColumn, vector<bdd>& fValues, bdd& iniDir, Directions& directions, TimeDependentActions& actions)
+void findPathAstar(Plan& plan, bdd startNode, bdd& relation, bdd endNode, vector<bool>& safeCells, vector<bdd>& q, vector<bdd>& qq, uint nRow, uint nColumn, vector<bdd>& fValues, bdd& iniDir, Directions& directions, TimeDependentActions& actions)
 {
     uint nodeCount = nRow * nColumn;
     stack<pair<int, int>> keyNodes;

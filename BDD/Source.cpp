@@ -28,11 +28,14 @@ ofstream out;
 //#define N_FUNCTIONS_AT_CELL (3 + 14*4)
 //#define N_FUNCTIONS_IN_FIELD (4 + 3*4) // до percept здесь было 4+3*2 (???)
 
-constexpr bool USE_NEW_SEARCH = true;
-
+constexpr int DEPEND_ON_NODE_VAR_COUNT = 11; // TODO показать из каких значений состоит
+constexpr int INDEPEND_FROM_NODE_VAR_COUNT = 30; // TODO 
 
 // Log_2(4*4+2*4) = 5
 constexpr int NUMS_FOR_F_VAL = 5;
+
+constexpr int NUMS_FOR_NODE_VAL = 4;
+
 constexpr int N_VAR = 207 + NUMS_FOR_F_VAL;
 
 Map mapInfo;
@@ -40,13 +43,6 @@ Map mapInfo;
 // TODO добавить класс для работы с bdd. Через него должна происходить инициализация переменных.
 
 // TODO подумать над взаимодействием поворотов и напралений (может быть их можно как-то связать?)
-
-/// <summary>
-///     Определение соседей относительно клетки cell
-/// </summary>
-/// <param name="cell"> Индекс ячейки поля, относительно которой определяются соседи </param>
-/// <returns> Вектор, который который содержит индексы соседей </returns>
-//vector<int> neighbourNodes(int cell);
 
 /// <summary>
 ///     прохожусь по соседям клетки, смотри те, которые еще не проверены, отправляю их на проверку
@@ -96,7 +92,7 @@ int Enviroment(bdd task, int current_cell);
 /// <param name="actionsNext"> -- Описание действий для перемещения </param>
 /// <param name="directions"> -- Направления движения </param>
 void find_path(stack <bdd> &plan, stack <string> &str_plan,
-               bdd relation, bdd first_state, bdd* q, bdd* qq,
+               bdd relation, bdd first_state, vector<bdd>& q, vector<bdd>& qq,
                bdd wished_state, vector<int> answer, vector<bdd> visited, bdd& direction,
                TimeDependentActions &actionsNext,
                Directions &directions);
@@ -116,17 +112,11 @@ bdd Breeze; // ощущение агентом ветерка
 bdd Scream; // ???
 
 // переменные состояния среды, СТАТИЧНЫЕ, ОТ ВРЕМЕНИ НЕ ЗАВИСЯТ
-bdd B[N]; //ветер
-bdd P[N]; //яма
-bdd S[N]; //запах
-bdd W[N]; //вампус
-bdd G[N]; //золото
-
-//// направления, куда смотрит агент, для символьных вычислений
-//bdd n; // Север
-//bdd e; // Запад
-//bdd s; // Юг
-//bdd w; // Восток
+vector<bdd> B; //ветер
+vector<bdd> P; //яма
+vector<bdd> S; //запах
+vector<bdd> W; //вампус
+vector<bdd> G; //золото
 
 //переменные состояния среды, ЗАВИСЯЩИЕ ОТ ВРЕМЕНИ
 #pragma region Time-dependent environment state variables
@@ -148,8 +138,8 @@ bdd ClimbedOut_next;
 //переменные положения агента, ЗАВИСЯЩИЕ ОТ ВРЕМЕНИ
 #pragma region Time-dependent agent position variables
 
-bdd L[N];      // текущее положение агента
-bdd L_next[N]; // положение агента в следующий момент времени
+vector<bdd> L;      // текущее положение агента
+vector<bdd> L_next; // положение агента в следующий момент времени
 
 bdd North;      // агент смотрит на север
 bdd North_next;
@@ -163,11 +153,11 @@ bdd South_next;
 bdd East;      // агент смотрит на восток
 bdd East_next;
 
-bdd V[N];       // посещённые агентом клетки
-bdd V_next[N];
+vector<bdd> V;       // посещённые агентом клетки
+vector<bdd> V_next;
 
-bdd OK[N];      // безопасные клетки
-bdd OK_next[N];
+vector<bdd> OK;      // безопасные клетки
+vector<bdd> OK_next;
 
 #pragma endregion 
 
@@ -199,10 +189,10 @@ vector<bool> checked_cells;  // массив проверенных клеток
 //vector<bool> unknown_cells;  // пока не можем говорить, безопасные или нет
 vector<bool> safe_cells;     // массив безопасных клеток
 
-bool not_safe_cells[N]; //массив небезопасных клеток (он нужен???)
-bool unknown_cells[N]; //пока не можем говорить, безопасные или нет (он нужен???)
+vector<bool> not_safe_cells; //массив небезопасных клеток (он нужен???)
+vector<bool> unknown_cells; //пока не можем говорить, безопасные или нет (он нужен???)
 
-stack <int> cells[N]; //стек для хранения предыдущей клетки
+stack<int> cells; //стек для хранения предыдущей клетки
 
 // флаги для символьных вычислений
 bool flag = false;
@@ -216,7 +206,7 @@ int main()
     constexpr uint MAP_COUNT = 10;
 
     string TEST_FOLDER = "../WampusWorldGenerator/";
-    string mapFolder = "4x4p5";
+    string mapFolder = "4x4p0";
     string testResFolder = "testResults/";
 
     ofstream oldRes;
@@ -228,7 +218,7 @@ int main()
     lint oldAlgoTimeSum = 0;
     lint newAlgoTimeSum = 0;
 
-    // Цикл по картам одного 
+    // Цикл по картам одного типа
     for (uint i = 0; i < MAP_COUNT; ++i)
     {
         lint oldAlgoTimeSubSum = 0;
@@ -263,35 +253,48 @@ int main()
 
 lint runAgent(string filePath, bool isAstarUse)
 {
-    // Чтение карты
+    // Печать информации об обозначении узлов и карты
     mapInfo = readMap(filePath);
+    cout << setw(3) << static_cast<int>(Node::AGENT) << " - Agent\n"
+         << setw(3) << static_cast<int>(Node::WUMPUS) << " - Wumpus\n"
+         << setw(3) << static_cast<int>(Node::PIT) << " - Pit\n"
+         << setw(3) << static_cast<int>(Node::GOLD) << " - Gold\n"
+         << setw(3) << static_cast<int>(Node::STENCH) << " - Stench\n"
+         << setw(3) << static_cast<int>(Node::BREEZE) << " - Breeze" << endl;
+    printMap(mapInfo.cave, mapInfo.nColumn, mapInfo.nRow, cout);
 
-    // Замечание. В программе сначала инициализируется статика, потом динамика
+    // Инициализация векторов
+    not_safe_cells = vector<bool>(mapInfo.n);
+    unknown_cells = vector<bool>(mapInfo.n);
+    B = vector<bdd>(mapInfo.n);
+    P = vector<bdd>(mapInfo.n);
+    S = vector<bdd>(mapInfo.n);
+    W = vector<bdd>(mapInfo.n);
+    G = vector<bdd>(mapInfo.n);
 
-    // Инициализация Buddy
-    int countvar = 0;             // Сквозной счетчик для bdd
-    bdd_init(10000000, 10000000); // Выделяем память для 1000000 строк таблицы и кэш размером 100000
-    bdd_setvarnum(N_VAR);         // Задаем количество булевых переменных
+    L = vector<bdd>(mapInfo.n);
+    V = vector<bdd>(mapInfo.n);
+    OK = vector<bdd>(mapInfo.n);
+    L_next = vector<bdd>(mapInfo.n);
+    V_next = vector<bdd>(mapInfo.n);
+    OK_next = vector<bdd>(mapInfo.n);
 
-    // Инициализация массивов
-    checked_cells = vector<bool>(N);
-    safe_cells = vector<bool>(N);
+    //cells = stack<int>(mapInfo.n);
+
+    checked_cells = vector<bool>(mapInfo.n);
+    safe_cells = vector<bool>(mapInfo.n);
     checked_cells[0] = true;
     safe_cells[0] = true;
-    for (int i = 1; i < N; ++i)
+    for (int i = 1; i < mapInfo.n; ++i)
     {
         checked_cells[i] = false;
         safe_cells[i] = false;
     }
 
-    cout << setw(3) << static_cast<int>(Node::AGENT)  << " - Agent\n"
-         << setw(3) << static_cast<int>(Node::WUMPUS) << " - Wumpus\n"
-         << setw(3) << static_cast<int>(Node::PIT)    << " - Pit\n"
-         << setw(3) << static_cast<int>(Node::GOLD)   << " - Gold\n"
-         << setw(3) << static_cast<int>(Node::STENCH) << " - Stench\n"
-         << setw(3) << static_cast<int>(Node::BREEZE) << " - Breeze" << endl;
-
-    printMap(mapInfo.cave, cout);
+    // Инициализация Buddy
+    int countvar = 0;             // Сквозной счетчик для bdd
+    bdd_init(10000000, 10000000); // Выделяем память для 1000000 строк таблицы и кэш размером 100000
+    bdd_setvarnum(N_VAR);         // Задаем количество булевых переменных
 
     bdd task = bddtrue; //Решение. Изначально true. Здесь будет находиться база
     bdd movements = bddtrue;
@@ -306,35 +309,35 @@ lint runAgent(string filePath, bool isAstarUse)
         // Для золота  N*4..N*5
 
         // для Вампуса
-        for (int i = 0; i < N; i++)
+        for (int i = 0; i < mapInfo.n; i++)
         {
             W[i] = bdd_ithvar(countvar);
             countvar++;
         }
 
         // для запаха
-        for (int i = 0; i < N; i++)
+        for (int i = 0; i < mapInfo.n; i++)
         {
             S[i] = bdd_ithvar(countvar);
             countvar++;
         }
 
         //для ям
-        for (int i = 0; i < N; i++)
+        for (int i = 0; i < mapInfo.n; i++)
         {
             P[i] = bdd_ithvar(countvar);
             countvar++;
         }
 
         //для ветра
-        for (int i = 0; i < N; i++)
+        for (int i = 0; i < mapInfo.n; i++)
         {
             B[i] = bdd_ithvar(countvar);
             countvar++;
         }
 
         // Для золота
-        for (int i = 0; i < N; i++)
+        for (int i = 0; i < mapInfo.n; i++)
         {
             G[i] = bdd_ithvar(countvar);
             countvar++;
@@ -356,21 +359,21 @@ lint runAgent(string filePath, bool isAstarUse)
     // Динамика
     {
         // для нахождения агента в клетке
-        for (int i = 0; i < N; i++)
+        for (int i = 0; i < mapInfo.n; i++)
         {
             L[i] = bdd_ithvar(countvar);
             countvar++;
         }
 
         // для посещение клетки агентом
-        for (int i = 0; i < N; i++)
+        for (int i = 0; i < mapInfo.n; i++)
         {
             V[i] = bdd_ithvar(countvar);
             countvar++;
         }
 
         //для безопасной клетки
-        for (int i = 0; i < N; i++)
+        for (int i = 0; i < mapInfo.n; i++)
         {
             OK[i] = bdd_ithvar(countvar);
             countvar++;
@@ -428,19 +431,19 @@ lint runAgent(string filePath, bool isAstarUse)
     // ПЕРЕМЕННЫЕ ДЛЯ СЛЕДУЮЩЕГО СОСТОЯНИЯ
     TimeDependentActions actionsNext;
     {
-        for (int i = 0; i < N; i++)
+        for (int i = 0; i < mapInfo.n; i++)
         {
             L_next[i] = bdd_ithvar(countvar);
             countvar++;
         }
 
-        for (int i = 0; i < N; i++)
+        for (int i = 0; i < mapInfo.n; i++)
         {
             V_next[i] = bdd_ithvar(countvar);
             countvar++;
         }
 
-        for (int i = 0; i < N; i++)
+        for (int i = 0; i < mapInfo.n; i++)
         {
             OK_next[i] = bdd_ithvar(countvar);
             countvar++;
@@ -514,7 +517,7 @@ lint runAgent(string filePath, bool isAstarUse)
     task &= V[0];
     task &= OK[0];
 
-    for (int i = 1; i < N; i++)
+    for (int i = 1; i < mapInfo.n; i++)
     {
         task &= !L[i];
         task &= !V[i];
@@ -543,7 +546,7 @@ lint runAgent(string filePath, bool isAstarUse)
     task &= !HaveGold;   // у агента нет золота
 
     // Формируем базу знаний не зависящую от времени
-    for (int i = 0; i < N; i++)
+    for (int i = 0; i < mapInfo.n; i++)
     {
         vector<int> neigbours = neighbourNodes(i, mapInfo.nRow, mapInfo.nColumn);
 
@@ -584,16 +587,16 @@ lint runAgent(string filePath, bool isAstarUse)
     {
         // Правило, что Вампус хотя бы один
         bdd temp_w = bddfalse;
-        for (int i = 0; i < N; i++)
+        for (int i = 0; i < mapInfo.n; i++)
         {
             temp_w |= W[i];
         }
         task &= temp_w;
 
         // Правило, что на поле не более одного Вампуса
-        for (int i = 0; i < N; i++)
+        for (int i = 0; i < mapInfo.n; i++)
         {
-            for (int j = 0; j < N; j++)
+            for (int j = 0; j < mapInfo.n; j++)
             {
                 if (j != i)
                 {
@@ -616,42 +619,42 @@ lint runAgent(string filePath, bool isAstarUse)
     task &= (!ClimbedOut_next ^ (Climb & ClimbedOut));
 
     // для изменения местоположения агента, пока не трогала (???)
-    for (int i = 0; i < N; i++)
+    for (int i = 0; i < mapInfo.n; i++)
     {
         bdd temp = L[i] & !Forward;
 
         // если ячейка не в крайнем левом столбце
-        if (i % N_COLUMN != 0)
+        if (i % mapInfo.nColumn != 0)
         {
             temp |= L[i - 1] & Forward & East;
         }
         // если ячейка не в крайнем правом столбце
-        if ((i + 1) % N_COLUMN != 0)
+        if ((i + 1) % mapInfo.nColumn != 0)
         {
             temp |= L[i + 1] & Forward & West;
         }
         // если ячейка не на самой нижней строке
-        if (i < N_COLUMN * (N_ROW - 1))
+        if (i < mapInfo.nColumn * (mapInfo.nRow - 1))
         {
-            temp |= L[i + N_COLUMN] & Forward & North;
+            temp |= L[i + mapInfo.nColumn] & Forward & North;
         }
         // если ячейка не на самой верхней строке
-        if (i >= N_COLUMN)
+        if (i >= mapInfo.nColumn)
         {
-            temp |= L[i - N_COLUMN] & Forward & South;
+            temp |= L[i - mapInfo.nColumn] & Forward & South;
         }
 
         task &= !L_next[i] ^ temp;
     }
 
     // ???
-    for (int i = 0; i < N; i++)
+    for (int i = 0; i < mapInfo.n; i++)
     {
         task &= !(V_next[i] ^ (V[i] | L[i]));
     }
 
     // переменные со стороны среды с учетом восприятия
-    for (int i = 0; i < N; i++)
+    for (int i = 0; i < mapInfo.n; i++)
     {
         task &= (L[i] >> (!Breeze ^ B[i]));
         task &= (L[i] >> (!Stench ^ S[i]));
@@ -679,8 +682,8 @@ lint runAgent(string filePath, bool isAstarUse)
 
     const int xSize = 12; // TODO размер массива правилен?
     bdd x[xSize];  // ???
-    bdd q[16];  // нештрихованные
-    bdd qq[16]; // штрихованные
+    vector<bdd> q(mapInfo.n);  // нештрихованные
+    vector<bdd> qq(mapInfo.n); // штрихованные
 
     // TODO это правильное выделение переменных?
     for (int i = 0; i < xSize; i++)
@@ -697,21 +700,21 @@ lint runAgent(string filePath, bool isAstarUse)
     // q[2] = 0..10 <=> !x[0] & .. &  x[N_LOG - 2] & !x[N_LOG - 1]
     // ...
     // q[N] = ... (последовательность из 0 и 1, которая в двоичном коде является представлением числа N)
-    for (int i = 0; i < N; ++i)
+    for (int i = 0; i < mapInfo.n; ++i)
     {
         q[i] = bddtrue;
         qq[i] = bddtrue;
-        for (int j = 0; j < N_LOG; ++j)
+        for (int j = 0; j < NUMS_FOR_NODE_VAL; ++j)
         {
-            if (((i >> (N_LOG - 1 - j)) & 1) == 1)
+            if (((i >> (NUMS_FOR_NODE_VAL - 1 - j)) & 1) == 1)
             {
                 q[i] &= x[j];
-                qq[i] &= x[j + N_LOG];
+                qq[i] &= x[j + NUMS_FOR_NODE_VAL];
             }
             else
             {
                 q[i] &= !x[j];
-                qq[i] &= !x[j + N_LOG];
+                qq[i] &= !x[j + NUMS_FOR_NODE_VAL];
             }
         }
     }
@@ -719,34 +722,34 @@ lint runAgent(string filePath, bool isAstarUse)
     // направления, куда смотрит агент, для символьных вычислений
     Directions dirs;
 
-    dirs.n = !x[8] & !x[9]; // 00
-    dirs.s = !x[8] & x[9];  // 01
-    dirs.e = x[8] & !x[9];  // 10
-    dirs.w = x[8] & x[9];   // 11
+    dirs.n = !x[NUMS_FOR_NODE_VAL * 2] & !x[NUMS_FOR_NODE_VAL * 2 + 1]; // 00
+    dirs.s = !x[NUMS_FOR_NODE_VAL * 2] & x[NUMS_FOR_NODE_VAL * 2 + 1];  // 01
+    dirs.e = x[NUMS_FOR_NODE_VAL * 2] & !x[NUMS_FOR_NODE_VAL * 2 + 1];  // 10
+    dirs.w = x[NUMS_FOR_NODE_VAL * 2] & x[NUMS_FOR_NODE_VAL * 2 + 1];   // 11
 
     // Описание переходов на графе для символьных вычислений
     bdd R = bddfalse;
-    for (int i = 0; i < N; ++i)
+    for (int i = 0; i < mapInfo.n; ++i)
     {
         // если ячейка не в крайнем левом столбце
-        if (i % N_COLUMN != 0)
+        if (i % mapInfo.nColumn != 0)
         {
             R |= q[i] & dirs.w & qq[i - 1];
         }
         // если ячейка не в крайнем правом столбце
-        if ((i + 1) % N_COLUMN != 0)
+        if ((i + 1) % mapInfo.nColumn != 0)
         {
             R |= q[i] & dirs.e & qq[i + 1];
         }
         // если ячейка не на самой нижней строке
-        if (i < N_COLUMN * (N_ROW - 1))
+        if (i < mapInfo.nColumn * (mapInfo.nRow - 1))
         {
-            R |= q[i] & dirs.s & qq[i + N_COLUMN];
+            R |= q[i] & dirs.s & qq[i + mapInfo.nColumn];
         }
         // если ячейка не на самой верхней строке
-        if (i >= N_COLUMN)
+        if (i >= mapInfo.nColumn)
         {
-            R |= q[i] & dirs.n & qq[i - N_COLUMN];
+            R |= q[i] & dirs.n & qq[i - mapInfo.nColumn];
         }
     }
 
@@ -755,8 +758,8 @@ lint runAgent(string filePath, bool isAstarUse)
     int cell_to_go = 0;
 
     vector<int> cells_visited_by_agent = { 0 };
-    vector<bool> reverse_cells(N);
-    for (int i = 0; i < N; ++i)
+    vector<bool> reverse_cells(mapInfo.n);
+    for (int i = 0; i < mapInfo.n; ++i)
     {
         reverse_cells[i] = false;
     }
@@ -933,7 +936,7 @@ int check_for_safety(bdd task, int current_cell) //проверка клетки на безопаснос
 	{
 		not_safe_cells[current_cell] = true; //говорим, что это клетка опасна
 		checked_cells[current_cell] = true;
-		cell_to_go_next = cells->top();
+		cell_to_go_next = cells.top();
 		if ((task &= !P[current_cell]) == bddfalse)
 			cout << "In cell " << current_cell << " is Pit!" << endl;
 		else if ((task &= !W[current_cell]) == bddfalse)
@@ -943,7 +946,7 @@ int check_for_safety(bdd task, int current_cell) //проверка клетки на безопаснос
 	{
 		unknown_cells[current_cell] = true; //говорим, что небезопасна
 		//checked_cells[current_cell] = true; //добавляем в массив проверенных
-		cell_to_go_next = cells->top();
+		cell_to_go_next = cells.top();
 	}
 	return cell_to_go_next;
 }
@@ -958,7 +961,7 @@ int find_unvisited(bdd task, int current_cell)
 		int check_if_safe = neighbours_of_cell[i];
 		if (checked_cells[check_if_safe] == false)
 		{
-			cells->push(current_cell);
+			cells.push(current_cell);
 			current_cell = check_if_safe;
 			break;
 		}
@@ -1050,7 +1053,7 @@ int move(int cell, string action, bdd &direction, Directions &dir)
 	if (direction == dir.n)
 	{
 		if (action == "forward")
-			cell = cell - N_ROW;
+			cell = cell - mapInfo.nRow;
 		else if (action == "turnLeft")
 			direction = dir.w;
 		else if (action == "turnRight")
@@ -1059,7 +1062,7 @@ int move(int cell, string action, bdd &direction, Directions &dir)
 	else if (direction == dir.s)
 	{
 		if (action == "forward")
-			cell = cell + N_ROW;
+			cell = cell + mapInfo.nRow;
 		else if (action == "turnLeft")
 			direction = dir.e;
 		else if (action == "turnRight")
@@ -1089,7 +1092,7 @@ int move(int cell, string action, bdd &direction, Directions &dir)
 // Увы, я не могу понять, какова цель этой функции 
 // (есть только стойкое ощущение, что функция просто ищет последовательность действий для перехода из одной клетки в соседнюю)
 void find_path(stack <bdd>& plan, stack <string>& str_plan,
-               bdd relation, bdd first_state, bdd* q, bdd* qq,
+               bdd relation, bdd first_state, vector<bdd>& q, vector<bdd>& qq,
                bdd wished_state, vector<int> answer, vector<bdd> visited, bdd& direction,
                TimeDependentActions& actionsNext,
                Directions& directions)
