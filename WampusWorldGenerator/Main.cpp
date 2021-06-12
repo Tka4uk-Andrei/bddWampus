@@ -94,11 +94,15 @@ int main()
         cout << "Enter amount of maps" << endl;
         cin >> mapAmount;
 
+        cout << "Enter start number for map file name" << endl;
+        int startI;
+        cin >> startI;
+
         // TODO добавить проверки полей на возможность создания
         // Количество узлов не превышает RAND_MAX, количество ям меньше количества узлов на 3
 
         srand(time(0));
-        for (int i = 0; i < mapAmount; ++i)
+        for (int i = startI; i < mapAmount + startI; ++i)
         {
             cout << "Generating map " << setw(4) << i + 1 << " of " << setw(4) << mapAmount << "\r";
 
@@ -147,7 +151,7 @@ int main()
             // печатаем результат в файл
             ofstream out;
             stringstream fileName;
-            fileName << "map_" << i << ".txt";
+            fileName << nRows << "x" << nColums << "p" << pitAmount << "/map_" << i << ".txt";
             out.open(fileName.str());
             out << nColums << " " << nRows;
             for (int j = 0; j < n; ++j)
@@ -172,7 +176,9 @@ int main()
             cin >> c;
         }
 
-        if (c == 'y')
+        cout << endl;
+
+        if (c == 'n')
         {
             programEnd = true;
         }
