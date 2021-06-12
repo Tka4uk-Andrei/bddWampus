@@ -31,12 +31,9 @@ ofstream out;
 constexpr int DEPEND_ON_NODE_VAR_COUNT = 11; // TODO показать из каких значений состоит
 constexpr int INDEPEND_FROM_NODE_VAR_COUNT = 30; // TODO 
 
-// Log_2(4*4+2*4) = 5
-constexpr int NUMS_FOR_F_VAL = 5;
+constexpr int NUMS_FOR_DIR = 2;
 
-constexpr int NUMS_FOR_NODE_VAL = 4;
-
-constexpr int N_VAR = 207 + NUMS_FOR_F_VAL;
+//constexpr int N_VAR = 207 + NUMS_FOR_F_VAL + 2 * NUMS_FOR_NODE_VAL + NUMS_FOR_DIR;
 
 Map mapInfo;
 
@@ -66,7 +63,7 @@ bdd ask_and_send_percept(vector<vector <Node>> Enviroment, int current_cell);
 /// <param name="task"></param>
 /// <param name="current_cell"></param>
 /// <returns></returns>
-int check_for_safety(bdd task, int current_cell);
+int check_for_safety(bdd task, int current_cell, ostream& out);
 
 /// <summary>
 ///     сочетает две функции: поиск соседей и проверку на безопасность
@@ -74,7 +71,7 @@ int check_for_safety(bdd task, int current_cell);
 /// <param name="task"></param>
 /// <param name="current_cell"></param>
 /// <returns></returns>
-int Enviroment(bdd task, int current_cell);
+int Enviroment(bdd task, int current_cell, ostream& out);
 
 /// <summary>
 /// 
@@ -198,70 +195,115 @@ stack<int> cells; //стек для хранения предыдущей клетки
 bool flag = false;
 bool to_stop_recursion;
 
-lint runAgent(string filePath, bool isAstarUse);
+lint runAgent(string filePath, bool isAstarUse, ostream& out, bool isFullRun);
+
+uint log_2(int n)
+{
+    uint val = 1;
+    while ((1 << val) < n)
+    {
+        ++val;
+    }
+    return val;
+}
 
 int main()
 {
-    constexpr uint TEST_COUNT = 15;
-    constexpr uint MAP_COUNT = 10;
+    bool aStarOn = true;
+    bool fullRun = true;
 
+    constexpr uint TEST_COUNT = 20;
     string TEST_FOLDER = "../WampusWorldGenerator/";
-    string mapFolder = "4x4p0";
     string testResFolder = "testResults/";
 
-    ofstream oldRes;
-    oldRes.open(testResFolder + "old_" + mapFolder + ".txt");
+    // количество карт для каждой папки
+    vector<uint> mapCounts = { /*10, 10, 10, 10, 10,*/
+                              /* 20, 20,*/ /*20, 20, 20, 20,*/
+                               30, /*30, 30,*/ 30, 30, 30, 30,
+                               40, /*40, 40,*/ 40, 40, 40, 40, 40,
+                               50, /*50, 50, 50,*/ 50, /*50,*/ 50, 50,
+                               50, /*50, 50, 50,*/ 50, /*50,*/ 50, 50, 50,
+                               50, /*50, 50, 50,*/ 50, /*50,*/ 50, /*50,*/ 50};
+    // перечисление папок с 
+    vector<string> mapFolders = { /*"4x4p0",   "4x4p1",   "4x4p2",   "4x4p3",   "4x4p5",*/
+                                  /*"5x5p0",   "5x5p1",*/   /*"5x5p2",   "5x5p3",   "5x5p5",   "5x5p8",*/
+                                  "6x6p0",   /*"6x6p1",   "6x6p2",*/   "6x6p3",   "6x6p5",   "6x6p8",   "6x6p13",
+                                  "7x7p0",   /*"7x7p1",   "7x7p2",*/   "7x7p3",   "7x7p5",   "7x7p8",   "7x7p13",   "7x7p21",
+                                  "8x8p0",   /*"8x8p1",   "8x8p2",   "8x8p3",*/   "8x8p5",  /* "8x8p8",*/   "8x8p13",   "8x8p21",
+                                  "9x9p0",   /*"9x9p1",   "9x9p2",   "9x9p3",*/   "9x9p5",  /* "9x9p8",*/   "9x9p13",   "9x9p21",   "9x9p34",
+                                  "10x10p0", /*"10x10p1", "10x10p2", "10x10p3",*/ "10x10p5", /*"10x10p8",*/ "10x10p13", /*"10x10p21",*/ "10x10p34"};
 
-    ofstream newRes;
-    newRes.open(testResFolder + "new_" + mapFolder + ".txt");
-
-    lint oldAlgoTimeSum = 0;
-    lint newAlgoTimeSum = 0;
-
-    // Цикл по картам одного типа
-    for (uint i = 0; i < MAP_COUNT; ++i)
+    for (int k = 0; k < mapFolders.size(); ++k )
     {
-        lint oldAlgoTimeSubSum = 0;
-        lint newAlgoTimeSubSum = 0;
+        ofstream oldRes;
+        oldRes.open(testResFolder + "old_" + mapFolders[k] + ".txt");
 
-        // Запускаем насколько раз программу на одном и том же наборе данных
-        for (uint j = 0; j < TEST_COUNT; ++j)
+        ofstream newRes;
+        newRes.open(testResFolder + "new_" + mapFolders[k] + ".txt");
+
+        lint oldAlgoTimeSum = 0;
+        lint newAlgoTimeSum = 0;
+
+        // Цикл по картам одного типа
+        for (uint i = 0; i < mapCounts[k]; ++i)
         {
-            stringstream mapName;
-            mapName << "map_" << i << ".txt";
+            lint oldAlgoTimeSubSum = 0;
+            lint newAlgoTimeSubSum = 0;
 
-            oldAlgoTimeSubSum += runAgent(TEST_FOLDER + mapFolder + "/" + mapName.str(), false);
-            newAlgoTimeSubSum += runAgent(TEST_FOLDER + mapFolder + "/" + mapName.str(), true);
+            // Запускаем насколько раз программу на одном и том же наборе данных
+            for (uint j = 0; j < TEST_COUNT; ++j)
+            {
+                stringstream mapName;
+                mapName << "map_" << i << ".txt";
+
+                cout << "Run test from " << setw(20) << mapFolders[k] + '/' + mapName.str() << " || Attempt " << setw(3) << j + 1 << " of " << setw(3) << TEST_COUNT << '\r';
+
+                ofstream logFile;
+                string logFileName = "log.txt";
+
+                logFile.open(testResFolder + logFileName, ios_base::app);
+                logFile << "<< Run old agent for map " << mapFolders[k] << "/" << mapName.str() << " >>" << endl;
+                oldAlgoTimeSubSum += runAgent(TEST_FOLDER + mapFolders[k] + "/" + mapName.str(), !aStarOn, logFile, !fullRun);
+                logFile.close();
+
+                logFile.open(testResFolder + logFileName, ios_base::app);
+                logFile << "<< Run new agent for map" << mapFolders[k] << "/" << mapName.str() << " >>" << endl;
+                newAlgoTimeSubSum += runAgent(TEST_FOLDER + mapFolders[k] + "/" + mapName.str(), aStarOn, logFile, !fullRun);
+                logFile.close();
+            }
+
+            cout << endl;
+
+            oldAlgoTimeSum += oldAlgoTimeSubSum / TEST_COUNT;
+            newAlgoTimeSum += newAlgoTimeSubSum / TEST_COUNT;
+
+            oldRes << oldAlgoTimeSubSum / TEST_COUNT << endl;
+            newRes << newAlgoTimeSubSum / TEST_COUNT << endl;
         }
 
-        oldAlgoTimeSum += oldAlgoTimeSubSum / TEST_COUNT;
-        newAlgoTimeSum += newAlgoTimeSubSum / TEST_COUNT;
+        oldRes << oldAlgoTimeSum / mapCounts[k] << endl;
+        newRes << newAlgoTimeSum / mapCounts[k] << endl;
 
-        oldRes << oldAlgoTimeSubSum / TEST_COUNT << endl;
-        newRes << newAlgoTimeSubSum / TEST_COUNT << endl;
+        oldRes.close();
+        newRes.close();
     }
 
-    oldRes << oldAlgoTimeSum / MAP_COUNT << endl;
-    newRes << newAlgoTimeSum / MAP_COUNT << endl;
-
-    oldRes.close();
-    newRes.close();
     cout << "<< Testing compleete! >>";
 
     return 0;
 }
 
-lint runAgent(string filePath, bool isAstarUse)
+lint runAgent(string filePath, bool isAstarUse, ostream& out, bool isFullRun)
 {
     // Печать информации об обозначении узлов и карты
     mapInfo = readMap(filePath);
-    cout << setw(3) << static_cast<int>(Node::AGENT) << " - Agent\n"
-         << setw(3) << static_cast<int>(Node::WUMPUS) << " - Wumpus\n"
-         << setw(3) << static_cast<int>(Node::PIT) << " - Pit\n"
-         << setw(3) << static_cast<int>(Node::GOLD) << " - Gold\n"
-         << setw(3) << static_cast<int>(Node::STENCH) << " - Stench\n"
-         << setw(3) << static_cast<int>(Node::BREEZE) << " - Breeze" << endl;
-    printMap(mapInfo.cave, mapInfo.nColumn, mapInfo.nRow, cout);
+    out << setw(3) << static_cast<int>(Node::AGENT) << " - Agent\n"
+        << setw(3) << static_cast<int>(Node::WUMPUS) << " - Wumpus\n"
+        << setw(3) << static_cast<int>(Node::PIT) << " - Pit\n"
+        << setw(3) << static_cast<int>(Node::GOLD) << " - Gold\n"
+        << setw(3) << static_cast<int>(Node::STENCH) << " - Stench\n"
+        << setw(3) << static_cast<int>(Node::BREEZE) << " - Breeze" << endl;
+    printMap(mapInfo.cave, mapInfo.nColumn, mapInfo.nRow, out);
 
     // Инициализация векторов
     not_safe_cells = vector<bool>(mapInfo.n);
@@ -291,15 +333,22 @@ lint runAgent(string filePath, bool isAstarUse)
         safe_cells[i] = false;
     }
 
+    // Рассчёт количества логических переменных
+    int maxFval = mapInfo.nColumn * mapInfo.nRow + 2 * max(mapInfo.nColumn, mapInfo.nRow);
+    uint NUMS_FOR_F_VAL = log_2(maxFval);
+    uint NUMS_FOR_NODE_VAL = log_2(mapInfo.n);
+    int N_VAR = DEPEND_ON_NODE_VAR_COUNT * mapInfo.n + INDEPEND_FROM_NODE_VAR_COUNT + 2 * NUMS_FOR_NODE_VAL + NUMS_FOR_DIR + NUMS_FOR_F_VAL + 1;
+
     // Инициализация Buddy
-    int countvar = 0;             // Сквозной счетчик для bdd
-    bdd_init(10000000, 10000000); // Выделяем память для 1000000 строк таблицы и кэш размером 100000
-    bdd_setvarnum(N_VAR);         // Задаем количество булевых переменных
+    int countvar = 0;               // Сквозной счетчик для bdd
+    bdd_init(10000000, 10000000);   // Выделяем память для 1000000 строк таблицы и кэш размером 100000
+    bdd_setvarnum(N_VAR);           // Задаем количество булевых переменных
 
     bdd task = bddtrue; //Решение. Изначально true. Здесь будет находиться база
     bdd movements = bddtrue;
 
     // Статика
+    if (isFullRun)
     {
         // Выделение bool переменных
         // для Вампуса 0..N
@@ -357,6 +406,7 @@ lint runAgent(string filePath, bool isAstarUse)
     }
 
     // Динамика
+    if (isFullRun)
     {
         // для нахождения агента в клетке
         for (int i = 0; i < mapInfo.n; i++)
@@ -430,6 +480,7 @@ lint runAgent(string filePath, bool isAstarUse)
 
     // ПЕРЕМЕННЫЕ ДЛЯ СЛЕДУЮЩЕГО СОСТОЯНИЯ
     TimeDependentActions actionsNext;
+    if (isFullRun)
     {
         for (int i = 0; i < mapInfo.n; i++)
         {
@@ -494,7 +545,6 @@ lint runAgent(string filePath, bool isAstarUse)
     // Переменные для функции оценки
     vector<bdd> fValues;
     int nodesCout = mapInfo.nColumn * mapInfo.nRow;
-    int maxFval = mapInfo.nColumn * mapInfo.nRow + 2 * max(mapInfo.nColumn, mapInfo.nRow);
     for (int i = 0; i < maxFval; ++i)
     {
         fValues.push_back(bddtrue);
@@ -512,184 +562,190 @@ lint runAgent(string filePath, bool isAstarUse)
     }
     countvar += NUMS_FOR_F_VAL;
 
-    // НАЧАЛЬНАЯ БЗ АГЕНТА                                          ПРОВЕРЕНО
-    task &= L[0];
-    task &= V[0];
-    task &= OK[0];
-
-    for (int i = 1; i < mapInfo.n; i++)
+    if (isFullRun)
     {
-        task &= !L[i];
-        task &= !V[i];
-    }
+        // НАЧАЛЬНАЯ БЗ АГЕНТА                                          ПРОВЕРЕНО
+        task &= L[0];
+        task &= V[0];
+        task &= OK[0];
 
-    task &= !P[0]; // в текущей клетке нет ямы
-    task &= !W[0]; // в текущей клетке нет Вампуса
-
-    task &= HaveArrow;    // есть стрела
-    task &= WumpusAlive;  // Вампус жив
-
-    task &= East;   // агент смотрит на восток
-    task &= !West;  // агент не смотрит на запад
-    task &= !South; // агент не смотрит на запад
-    task &= !North; // агент не смотрит на запад
-
-    task &= !Forward;   // агент не двигался вперёд
-    task &= !TurnLeft;  // агент не поворачивал налево
-    task &= !TurnRight; // агент не поворачивал направо
-
-    task &= !Grab;  // агент не брал золото
-    task &= !Shoot; // агент не стрелял
-    task &= !Climb; // агент не совершал действие, чтобы выбирался из пещеры
-
-    task &= !ClimbedOut; // агент не выбирался из пещеры
-    task &= !HaveGold;   // у агента нет золота
-
-    // Формируем базу знаний не зависящую от времени
-    for (int i = 0; i < mapInfo.n; i++)
-    {
-        vector<int> neigbours = neighbourNodes(i, mapInfo.nRow, mapInfo.nColumn);
-
-        // формируем tempB, tempP, tempS.
-        // отдельно формируем tempW
-        // tempW это формула вида: (x1*!x2*..*!xn) | (!x1*x2*!x3*..*!xn) | .. | (!x1*..!x(n-1)*xn)
-        bdd tempP = bddfalse;
-        bdd tempB = bddtrue;
-        bdd tempW = bddfalse;
-        bdd tempS = bddtrue;
-        for (int i = 0; i < neigbours.size(); ++i)
+        for (int i = 1; i < mapInfo.n; i++)
         {
-            tempP |= P[neigbours[i]];
-            tempB &= B[neigbours[i]];
-            tempS &= S[neigbours[i]];
-            bdd temp = bddtrue;
-            for (int j = 0; j < neigbours.size(); ++j)
-            {
-                if (i == j)
-                {
-                    temp &= W[neigbours[j]];
-                }
-                else
-                {
-                    temp &= !W[neigbours[j]];
-                }
-            }
-            tempW |= temp;
+            task &= !L[i];
+            task &= !V[i];
         }
 
-        task &= (!B[i] ^ tempP) &
+        task &= !P[0]; // в текущей клетке нет ямы
+        task &= !W[0]; // в текущей клетке нет Вампуса
+
+        task &= HaveArrow;    // есть стрела
+        task &= WumpusAlive;  // Вампус жив
+
+        task &= East;   // агент смотрит на восток
+        task &= !West;  // агент не смотрит на запад
+        task &= !South; // агент не смотрит на запад
+        task &= !North; // агент не смотрит на запад
+
+        task &= !Forward;   // агент не двигался вперёд
+        task &= !TurnLeft;  // агент не поворачивал налево
+        task &= !TurnRight; // агент не поворачивал направо
+
+        task &= !Grab;  // агент не брал золото
+        task &= !Shoot; // агент не стрелял
+        task &= !Climb; // агент не совершал действие, чтобы выбирался из пещеры
+
+        task &= !ClimbedOut; // агент не выбирался из пещеры
+        task &= !HaveGold;   // у агента нет золота
+
+
+        // Формируем базу знаний не зависящую от времени
+        for (int i = 0; i < mapInfo.n; i++)
+        {
+            vector<int> neigbours = neighbourNodes(i, mapInfo.nRow, mapInfo.nColumn);
+
+            // формируем tempB, tempP, tempS.
+            // отдельно формируем tempW
+            // tempW это формула вида: (x1*!x2*..*!xn) | (!x1*x2*!x3*..*!xn) | .. | (!x1*..!x(n-1)*xn)
+            bdd tempP = bddfalse;
+            bdd tempB = bddtrue;
+            bdd tempW = bddfalse;
+            bdd tempS = bddtrue;
+            for (int i = 0; i < neigbours.size(); ++i)
+            {
+                tempP |= P[neigbours[i]];
+                tempB &= B[neigbours[i]];
+                tempS &= S[neigbours[i]];
+                bdd temp = bddtrue;
+                for (int j = 0; j < neigbours.size(); ++j)
+                {
+                    if (i == j)
+                    {
+                        temp &= W[neigbours[j]];
+                    }
+                    else
+                    {
+                        temp &= !W[neigbours[j]];
+                    }
+                }
+                tempW |= temp;
+            }
+
+            task &= (!B[i] ^ tempP) &
                 (!P[i] ^ tempB) &
                 (!S[i] ^ tempW) &
                 (!W[i] ^ tempS);
-    }
-
-    // Два правила про Вампуса
-    {
-        // Правило, что Вампус хотя бы один
-        bdd temp_w = bddfalse;
-        for (int i = 0; i < mapInfo.n; i++)
-        {
-            temp_w |= W[i];
         }
-        task &= temp_w;
 
-        // Правило, что на поле не более одного Вампуса
-        for (int i = 0; i < mapInfo.n; i++)
+        // Два правила про Вампуса
         {
-            for (int j = 0; j < mapInfo.n; j++)
+            // Правило, что Вампус хотя бы один
+            bdd temp_w = bddfalse;
+            for (int i = 0; i < mapInfo.n; i++)
             {
-                if (j != i)
+                temp_w |= W[i];
+            }
+            task &= temp_w;
+
+            // Правило, что на поле не более одного Вампуса
+            for (int i = 0; i < mapInfo.n; i++)
+            {
+                for (int j = 0; j < mapInfo.n; j++)
                 {
-                    task &= (W[i] >> !W[j]);
+                    if (j != i)
+                    {
+                        task &= (W[i] >> !W[j]);
+                    }
                 }
             }
         }
-    }
 
-    task &= (!HaveArrow_next ^ (HaveArrow & !Shoot));
-    task &= (!WumpusAlive_next ^ (WumpusAlive & !Scream));
+        task &= (!HaveArrow_next ^ (HaveArrow & !Shoot));
+        task &= (!WumpusAlive_next ^ (WumpusAlive & !Scream));
 
-    //направление агента
-    task &= (!North_next ^ ((TurnRight & West) | (TurnLeft & East) | (North & !TurnLeft & !TurnRight)));
-    task &= (!South_next ^ ((TurnRight & East) | (TurnLeft & West) | (South & !TurnLeft & !TurnRight)));
-    task &= (!East_next ^ ((TurnRight & North) | (TurnLeft & South) | (East & !TurnLeft & !TurnRight)));
-    task &= (!West_next ^ ((TurnRight & South) | (TurnLeft & North) | (West & !TurnLeft & !TurnRight)));
+        //направление агента
+        task &= (!North_next ^ ((TurnRight & West) | (TurnLeft & East) | (North & !TurnLeft & !TurnRight)));
+        task &= (!South_next ^ ((TurnRight & East) | (TurnLeft & West) | (South & !TurnLeft & !TurnRight)));
+        task &= (!East_next ^ ((TurnRight & North) | (TurnLeft & South) | (East & !TurnLeft & !TurnRight)));
+        task &= (!West_next ^ ((TurnRight & South) | (TurnLeft & North) | (West & !TurnLeft & !TurnRight)));
 
-    task &= (!HaveGold_next ^ (Grab & HaveGold));
-    task &= (!ClimbedOut_next ^ (Climb & ClimbedOut));
+        task &= (!HaveGold_next ^ (Grab & HaveGold));
+        task &= (!ClimbedOut_next ^ (Climb & ClimbedOut));
 
-    // для изменения местоположения агента, пока не трогала (???)
-    for (int i = 0; i < mapInfo.n; i++)
-    {
-        bdd temp = L[i] & !Forward;
 
-        // если ячейка не в крайнем левом столбце
-        if (i % mapInfo.nColumn != 0)
+        // для изменения местоположения агента, пока не трогала (???)
+        for (int i = 0; i < mapInfo.n; i++)
         {
-            temp |= L[i - 1] & Forward & East;
+            bdd temp = L[i] & !Forward;
+
+            // если ячейка не в крайнем левом столбце
+            if (i % mapInfo.nColumn != 0)
+            {
+                temp |= L[i - 1] & Forward & East;
+            }
+            // если ячейка не в крайнем правом столбце
+            if ((i + 1) % mapInfo.nColumn != 0)
+            {
+                temp |= L[i + 1] & Forward & West;
+            }
+            // если ячейка не на самой нижней строке
+            if (i < mapInfo.nColumn * (mapInfo.nRow - 1))
+            {
+                temp |= L[i + mapInfo.nColumn] & Forward & North;
+            }
+            // если ячейка не на самой верхней строке
+            if (i >= mapInfo.nColumn)
+            {
+                temp |= L[i - mapInfo.nColumn] & Forward & South;
+            }
+
+            task &= !L_next[i] ^ temp;
         }
-        // если ячейка не в крайнем правом столбце
-        if ((i + 1) % mapInfo.nColumn != 0)
+
+        // ???
+        for (int i = 0; i < mapInfo.n; i++)
         {
-            temp |= L[i + 1] & Forward & West;
+            task &= !(V_next[i] ^ (V[i] | L[i]));
         }
-        // если ячейка не на самой нижней строке
-        if (i < mapInfo.nColumn * (mapInfo.nRow - 1))
+
+        // переменные со стороны среды с учетом восприятия
+        for (int i = 0; i < mapInfo.n; i++)
         {
-            temp |= L[i + mapInfo.nColumn] & Forward & North;
+            task &= (L[i] >> (!Breeze ^ B[i]));
+            task &= (L[i] >> (!Stench ^ S[i]));
+            task &= L[i] >> V[i];
+            task &= ((!OK[i] | !P[i]) & (OK[i] | P[i] | W[i]) & (OK[i] | P[i] | WumpusAlive) & (!OK[i] | !W[i] | !WumpusAlive));
         }
-        // если ячейка не на самой верхней строке
-        if (i >= mapInfo.nColumn)
-        {
-            temp |= L[i - mapInfo.nColumn] & Forward & South;
-        }
+    
+        // взаимодействие действий и переменных
 
-        task &= !L_next[i] ^ temp;
+        task &= (Shoot >> HaveArrow);
+
+        task &= (Forward >> (!Shoot & !TurnLeft & !TurnRight & !Grab & !Climb));
+        task &= (Shoot >> (!Forward & !TurnLeft & !TurnRight & !Grab & !Climb));
+        task &= (TurnLeft >> (!Shoot & !Forward & !TurnRight & !Grab & !Climb));
+        task &= (TurnRight >> (!Shoot & !TurnLeft & !Forward & !Grab & !Climb));
+        task &= (Grab >> (!Shoot & !TurnLeft & !Forward & !TurnRight & !Climb));
+        task &= (Climb >> (!Shoot & !TurnLeft & !Forward & !Grab & !TurnRight));
+
+        task &= (East >> (!West & !South & !North));
+        task &= (West >> (!East & !South & !North));
+        task &= (South >> (!West & !East & !North));
+        task &= (North >> (!West & !East & !South));
+
     }
-
-    // ???
-    for (int i = 0; i < mapInfo.n; i++)
-    {
-        task &= !(V_next[i] ^ (V[i] | L[i]));
-    }
-
-    // переменные со стороны среды с учетом восприятия
-    for (int i = 0; i < mapInfo.n; i++)
-    {
-        task &= (L[i] >> (!Breeze ^ B[i]));
-        task &= (L[i] >> (!Stench ^ S[i]));
-        task &= L[i] >> V[i];
-        task &= ((!OK[i] | !P[i]) & (OK[i] | P[i] | W[i]) & (OK[i] | P[i] | WumpusAlive) & (!OK[i] | !W[i] | !WumpusAlive));
-    }
-
-    // взаимодействие действий и переменных
-
-    task &= (Shoot >> HaveArrow);
-
-    task &= (Forward >> (!Shoot & !TurnLeft & !TurnRight & !Grab & !Climb));
-    task &= (Shoot >> (!Forward & !TurnLeft & !TurnRight & !Grab & !Climb));
-    task &= (TurnLeft >> (!Shoot & !Forward & !TurnRight & !Grab & !Climb));
-    task &= (TurnRight >> (!Shoot & !TurnLeft & !Forward & !Grab & !Climb));
-    task &= (Grab >> (!Shoot & !TurnLeft & !Forward & !TurnRight & !Climb));
-    task &= (Climb >> (!Shoot & !TurnLeft & !Forward & !Grab & !TurnRight));
-
-    task &= (East >> (!West & !South & !North));
-    task &= (West >> (!East & !South & !North));
-    task &= (South >> (!West & !East & !North));
-    task &= (North >> (!West & !East & !South));
 
     // СИМВОЛЬНЫЕ ВЫЧИСЛЕНИЯ
 
-    const int xSize = 12; // TODO размер массива правилен?
-    bdd x[xSize];  // ???
     vector<bdd> q(mapInfo.n);  // нештрихованные
     vector<bdd> qq(mapInfo.n); // штрихованные
 
-    // TODO это правильное выделение переменных?
-    for (int i = 0; i < xSize; i++)
-    {
-        x[i] = bdd_ithvar(i);
-    }
+    //const int xSize = 12; // TODO размер массива правилен?
+    //bdd x[xSize];  // ???
+    //// TODO это правильное выделение переменных?
+    //for (int i = 0; i < xSize; i++)
+    //{
+    //    x[i] = bdd_ithvar(i);
+    //}
 
     // Элементам массива q и qq присваиваются следующие значения
     // q[i]  = x[0] & .. & x[N_LOG - 1]
@@ -706,26 +762,34 @@ lint runAgent(string filePath, bool isAstarUse)
         qq[i] = bddtrue;
         for (int j = 0; j < NUMS_FOR_NODE_VAL; ++j)
         {
+            int jj = j + countvar;
             if (((i >> (NUMS_FOR_NODE_VAL - 1 - j)) & 1) == 1)
             {
-                q[i] &= x[j];
-                qq[i] &= x[j + NUMS_FOR_NODE_VAL];
+                q[i] &= bdd_ithvar(jj);
+                qq[i] &= bdd_ithvar(jj + NUMS_FOR_NODE_VAL);
             }
             else
             {
-                q[i] &= !x[j];
-                qq[i] &= !x[j + NUMS_FOR_NODE_VAL];
+                q[i] &= !bdd_ithvar(jj);
+                qq[i] &= !bdd_ithvar(jj + NUMS_FOR_NODE_VAL);
             }
         }
     }
+    countvar += 2 * NUMS_FOR_NODE_VAL;
 
     // направления, куда смотрит агент, для символьных вычислений
     Directions dirs;
 
-    dirs.n = !x[NUMS_FOR_NODE_VAL * 2] & !x[NUMS_FOR_NODE_VAL * 2 + 1]; // 00
-    dirs.s = !x[NUMS_FOR_NODE_VAL * 2] & x[NUMS_FOR_NODE_VAL * 2 + 1];  // 01
-    dirs.e = x[NUMS_FOR_NODE_VAL * 2] & !x[NUMS_FOR_NODE_VAL * 2 + 1];  // 10
-    dirs.w = x[NUMS_FOR_NODE_VAL * 2] & x[NUMS_FOR_NODE_VAL * 2 + 1];   // 11
+    //dirs.n = !x[NUMS_FOR_NODE_VAL * 2] & !x[NUMS_FOR_NODE_VAL * 2 + 1]; // 00
+    //dirs.s = !x[NUMS_FOR_NODE_VAL * 2] & x[NUMS_FOR_NODE_VAL * 2 + 1];  // 01
+    //dirs.e = x[NUMS_FOR_NODE_VAL * 2] & !x[NUMS_FOR_NODE_VAL * 2 + 1];  // 10
+    //dirs.w = x[NUMS_FOR_NODE_VAL * 2] & x[NUMS_FOR_NODE_VAL * 2 + 1];   // 11
+
+    dirs.n = !bdd_ithvar(countvar) & !bdd_ithvar(countvar + 1); // 00
+    dirs.s = !bdd_ithvar(countvar) & bdd_ithvar(countvar + 1);  // 01
+    dirs.e = bdd_ithvar(countvar) & !bdd_ithvar(countvar + 1);  // 10
+    dirs.w = bdd_ithvar(countvar) & bdd_ithvar(countvar + 1);   // 11
+    countvar += NUMS_FOR_DIR;
 
     // Описание переходов на графе для символьных вычислений
     bdd R = bddfalse;
@@ -764,70 +828,97 @@ lint runAgent(string filePath, bool isAstarUse)
         reverse_cells[i] = false;
     }
 
-	bdd relation;
-	vector <bdd> visited = { qq[current_cell] };
-	vector <int> answer;
-	bdd direction = dirs.e;
+    bdd relation;
+    vector <bdd> visited = { qq[current_cell] };
+    vector <int> answer;
+    bdd direction = dirs.e;
     stack <bdd> plan;
     stack <string> str_plan;
-	stack <string> new_plan;
-	stack <int> previous_cell;
+    stack <string> new_plan;
+    stack <int> previous_cell;
 
     // Засекаем время старта алгоритма
     auto start = std::chrono::high_resolution_clock::now();
 
-    bool gold_flag = false;
-    // Ходим по полю, пока не найдём золото
-    while (gold_flag != true)
+    if (isFullRun)
     {
-        cout << "Current cell is " << current_cell << endl;
 
-        bdd percept = ask_and_send_percept(mapInfo.cave, current_cell);
-        // Если мы на клетке с золотом
-        if ((percept &= !G[current_cell]) == bddfalse)
+        bool gold_flag = false;
+        // Ходим по полю, пока не найдём золото
+        while (gold_flag != true)
         {
-            cout << "" << endl;
-            cout << "In cell " << current_cell << " is Gold! " << endl;
-            cout << "Now agent is going back to the exit" << endl;
-            cout << "" << endl;
+            out << "Current cell is " << current_cell << endl;
 
-            gold_flag = true;
-        }
-        // Если мы всё ещё в поисках золота
-        else
-        {
-            task &= percept;
-
-            cell_to_go = Enviroment(task, current_cell);
-
-            bdd current_relation = R & q[current_cell];
-
-            current_relation &= qq[cell_to_go];
-
-            relation |= current_relation;
-
-            find_path(plan, str_plan, current_relation, q[current_cell], q, qq, qq[cell_to_go], answer, visited, direction, actionsNext, dirs);
-            to_stop_recursion = false;
-            int size = str_plan.size();
-            for (int i = 0; i < size; i++)
+            bdd percept = ask_and_send_percept(mapInfo.cave, current_cell);
+            // Если мы на клетке с золотом
+            if ((percept &= !G[current_cell]) == bddfalse)
             {
-                new_plan.push(str_plan.top());
-                str_plan.pop();
+                out << "" << endl;
+                out << "In cell " << current_cell << " is Gold! " << endl;
+                out << "Now agent is going back to the exit" << endl;
+                out << "" << endl;
+
+                gold_flag = true;
             }
-
-            for (int i = 0; i < size; i++)
+            // Если мы всё ещё в поисках золота
+            else
             {
-                if (!new_plan.empty())
+                task &= percept;
+
+                cell_to_go = Enviroment(task, current_cell, out);
+
+                bdd current_relation = R & q[current_cell];
+
+                current_relation &= qq[cell_to_go];
+
+                relation |= current_relation;
+
+                find_path(plan, str_plan, current_relation, q[current_cell], q, qq, qq[cell_to_go], answer, visited, direction, actionsNext, dirs);
+                to_stop_recursion = false;
+                int size = str_plan.size();
+                for (int i = 0; i < size; i++)
                 {
-                    string action = new_plan.top();
-                    current_cell = move(current_cell, action, direction, dirs);
-                    cout << "action done by an agent - " << action << endl;
-                    new_plan.pop();
+                    new_plan.push(str_plan.top());
+                    str_plan.pop();
+                }
+
+                for (int i = 0; i < size; i++)
+                {
+                    if (!new_plan.empty())
+                    {
+                        string action = new_plan.top();
+                        current_cell = move(current_cell, action, direction, dirs);
+                        out << "action done by an agent - " << action << endl;
+                        new_plan.pop();
+                    }
+                }
+                cells_visited_by_agent.push_back(current_cell);
+                out << "Current cell is " << current_cell << endl;
+            }
+        }
+
+    }
+
+    if (!isFullRun)
+    {
+        int goldCell = 0;
+        for (int j = 0; j < mapInfo.n; ++j)
+        {
+            safe_cells[j] = true;
+            for (int i = 0; i < mapInfo.cave[j].size(); ++i)
+            {
+                if (mapInfo.cave[j][i] == Node::GOLD)
+                {
+                    goldCell = j;
+                }
+                else if (mapInfo.cave[j][i] == Node::PIT || mapInfo.cave[j][i] == Node::WUMPUS)
+                {
+                    safe_cells[j] = false;
                 }
             }
-            cells_visited_by_agent.push_back(current_cell);
-            cout << "Current cell is " << current_cell << endl;
         }
+
+        current_cell = goldCell;
     }
 
     // Поиск обратного пути, после того как нашли золото
@@ -836,22 +927,24 @@ lint runAgent(string filePath, bool isAstarUse)
     if (isAstarUse)
     {
         Plan plan;
-        findPathAstar(plan, q[current_cell], R, q[0], safe_cells, q, qq, mapInfo.nRow, mapInfo.nColumn, fValues, direction, dirs, actionsNext);
+        findPathAstar(plan, current_cell, R, 0, safe_cells, q, qq, mapInfo.nRow, mapInfo.nColumn, fValues, direction, dirs, actionsNext);
 
        for (int i = 0; i < plan.strPlan.size(); ++i)
         {
             string action = plan.strPlan[i];
             current_cell = move(current_cell, action, direction, dirs);
-            cout << "Action done by an agent - " << action << '\n';
-            cout << "Current cell is " << current_cell << endl;
+            out << "Action done by an agent - " << action << '\n';
+            out << "Current cell is " << current_cell << endl;
         }
     }
     // Используем Сонину реализацию
     else
     {
+        int startCell = current_cell;
+        bool endFlag = false;
         bdd new_relation;
         // пока не вернулись назад
-        while (current_cell != 0)
+        while (current_cell != 0 && !endFlag)
         {
             int cellToGo = current_cell;
             previous_cell.push(current_cell);
@@ -869,15 +962,21 @@ lint runAgent(string filePath, bool isAstarUse)
                 }
             }
 
-            // если нам некуда идти (мы в тупике), возвращаемся назад
-            if (cellToGo == current_cell)
+            // если мы не можем найти путь к узлу назначения
+            if (cellToGo == startCell)
             {
+                endFlag = true;
+            }
+            // если нам некуда идти (мы в тупике), возвращаемся назад
+            else if (cellToGo == current_cell)
+            {
+
                 // почему такая последовательность ??? (как это вообще работает?)
                 current_cell = previous_cell.top();
                 previous_cell.pop();
                 current_cell = previous_cell.top();
                 previous_cell.pop();
-                cout << "Current cell is " << current_cell << endl;
+                out << "Current cell is " << current_cell << endl;
             }
             // Иначе меняем текущее положение на новое
             else
@@ -899,13 +998,13 @@ lint runAgent(string filePath, bool isAstarUse)
                     {
                         string action = new_plan.top();
                         current_cell = move(current_cell, action, direction, dirs);
-                        cout << "action done by an agent - " << action << endl;
+                        out << "action done by an agent - " << action << endl;
                         new_plan.pop();
                     }
                 }
 
                 current_cell = cellToGo;
-                cout << "Current cell is " << current_cell << endl;
+                out << "Current cell is " << current_cell << endl;
             }
         }
     }
@@ -913,8 +1012,8 @@ lint runAgent(string filePath, bool isAstarUse)
     // Время работы алгоритма
     auto diff = std::chrono::high_resolution_clock::now() - start; 
     auto microsec = std::chrono::duration_cast<std::chrono::microseconds>(diff);
-    cout << "" << endl;
-    cout << "Calculations took: " << microsec.count() << " microseconds" << endl;
+    out << "" << endl;
+    out << "Calculations took: " << microsec.count() << " microseconds" << endl;
 
     // Завершение
     bdd_done();
@@ -922,7 +1021,7 @@ lint runAgent(string filePath, bool isAstarUse)
 }
 
 //проверка клетки на безопасность
-int check_for_safety(bdd task, int current_cell) //проверка клетки на безопасность
+int check_for_safety(bdd task, int current_cell, ostream& out) //проверка клетки на безопасность
 {
 	int cell_to_go_next;
 	if ((task & !OK[current_cell]) == bddfalse) //если она безопасна
@@ -938,9 +1037,9 @@ int check_for_safety(bdd task, int current_cell) //проверка клетки на безопаснос
 		checked_cells[current_cell] = true;
 		cell_to_go_next = cells.top();
 		if ((task &= !P[current_cell]) == bddfalse)
-			cout << "In cell " << current_cell << " is Pit!" << endl;
+			out << "In cell " << current_cell << " is Pit!" << endl;
 		else if ((task &= !W[current_cell]) == bddfalse)
-			cout << "In cell " << current_cell << " is Wumpus!" << endl;
+			out << "In cell " << current_cell << " is Wumpus!" << endl;
 	}
 	else //если неизвстна
 	{
@@ -996,14 +1095,14 @@ bdd ask_and_send_percept(vector<vector<Node>> Enviroment, int current_cell)
     }
 }
 
-int Enviroment(bdd task, int current_cell)
+int Enviroment(bdd task, int current_cell, ostream& out)
 {
 	int cell_to_check;
 	int got_unsafe_cell;
 	int count = 0;
 
 	cell_to_check = find_unvisited(task, current_cell); //ближайшая непосещенная клетка, которую можно проверить на безопасность
-	cell_to_check = check_for_safety(task, cell_to_check); //проверка на безопасность
+	cell_to_check = check_for_safety(task, cell_to_check, out); //проверка на безопасность
 
 	if (cell_to_check == current_cell)
 	{
@@ -1027,7 +1126,7 @@ int Enviroment(bdd task, int current_cell)
 			{
 				if (unknown_cells[neighb[i]] == false && checked_cells[neighb[i]] == false)
 				{
-					return cell_to_check = check_for_safety(task, neighb[i]);
+					return cell_to_check = check_for_safety(task, neighb[i], out);
 				}
 			}
 		}

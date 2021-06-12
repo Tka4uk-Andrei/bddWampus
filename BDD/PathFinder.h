@@ -466,9 +466,9 @@ uint hDist(int cur, int dest, int nColumn)
 ///     ѕоиск пути между указанными узлами. ≈сли пути нет, поведение не предсказуемо
 /// </summary>
 /// <param name="plan"> -- ѕлан действий дл€ достижени€ конечного узла </param>
-/// <param name="startNode"> -- ”зел из которого строитс€ маршрут </param>
+/// <param name="startNodeNum"> -- Ќомер узела из которого строитс€ маршрут </param>
 /// <param name="relation"> --  </param>
-/// <param name="endNode"> -- ”зел назначени€ </param>
+/// <param name="endNodeNum"> -- Ќомер узела назначени€ </param>
 /// <param name="safeCells"> -- ћассив, содержащий информацию о безопасных €чейках </param>
 /// <param name="q"> -- ћассив узлов закодированных в BDD дл€ текущего момента времени </param>
 /// <param name="qq"> -- ћассив узлов закодированных в BDD дл€ следующего момента времени </param>
@@ -476,7 +476,7 @@ uint hDist(int cur, int dest, int nColumn)
 /// <param name="nColumn"> -- Ўирина пол€ </param>
 /// <param name="fValues"> -- ћассив с преподсчитанными значени€ми функции оценки </param>
 /// <param name="iniDir"> -- начальное направление агента </param>
-void findPathAstar(Plan& plan, bdd startNode, bdd& relation, bdd endNode, vector<bool>& safeCells, vector<bdd>& q, vector<bdd>& qq, uint nRow, uint nColumn, vector<bdd>& fValues, bdd& iniDir, Directions& directions, TimeDependentActions& actions)
+void findPathAstar(Plan& plan, int startNodeNum, bdd& relation, int endNodeNum, vector<bool>& safeCells, vector<bdd>& q, vector<bdd>& qq, uint nRow, uint nColumn, vector<bdd>& fValues, bdd& iniDir, Directions& directions, TimeDependentActions& actions)
 {
     uint nodeCount = nRow * nColumn;
     stack<pair<int, int>> keyNodes;
@@ -503,26 +503,12 @@ void findPathAstar(Plan& plan, bdd startNode, bdd& relation, bdd endNode, vector
         }
     }
 
-    // TODO передавать как параметр
-    int startNodeNum = 0;
-    while (startNode != q[startNodeNum])
-    {
-        ++startNodeNum;
-    }
-
-    // TODO передавать как параметр
-    int endNodeNum = 0;
-    while (endNode != q[endNodeNum])
-    {
-        ++endNodeNum;
-    }
-
     // основна€ работа алгоритма поиска
 
     // инициализируем очередь
     bdd queue = bddfalse;
-    queue |= fValues[hDist(startNodeNum, endNodeNum, nColumn)] & startNode;
-    while ((queue & endNode) == bddfalse)
+    queue |= fValues[hDist(startNodeNum, endNodeNum, nColumn)] & q[startNodeNum];
+    while ((queue & q[endNodeNum]) == bddfalse && queue != bddfalse)
     {
         // извлекаем узел с минимальным значением
         // TODO сделать через обход по дереву
@@ -559,14 +545,16 @@ void findPathAstar(Plan& plan, bdd startNode, bdd& relation, bdd endNode, vector
                     // проверка на то, что соседний узел не был добавлен в очередь
                     if ((queue & q[nextNode]) != bddfalse)
                     {
+                        bdd temp = queue & q[nextNode];
                         int fValNext = 0;
-                        while ((queue & fValues[fValNext]) == bddfalse)
+                        while ((temp & fValues[fValNext]) == bddfalse)
                         {
                             ++fValNext;
                         }
 
                         // удал€ем старый элемент из очереди и добавл€ем новое значение
-                        queue |= !(fValues[fValNext] & q[nextNode]) | fValues[min(fValNext, newFval)] & q[nextNode];
+                        queue &= !(fValues[fValNext] & q[nextNode]);
+                        queue |= (fValues[min(fValNext, newFval)] & q[nextNode]);
                     }
                     else
                     {
@@ -583,8 +571,14 @@ void findPathAstar(Plan& plan, bdd startNode, bdd& relation, bdd endNode, vector
         keyNodes.push(pair<int, int>(node, fVal - hDist(node, endNodeNum, nColumn)));
     }
 
+    // ≈сли пути до узла назначени€ не существует
+    if (queue == bddfalse)
+    {
+        return;
+    }
+
     // получаем итоговое значение
-    bdd endInfo = queue & endNode;
+    bdd endInfo = queue & q[endNodeNum];
     int gVal = 0;
     while ((queue & fValues[gVal]) == bddfalse)
     {
@@ -645,7 +639,7 @@ int getDirId(bdd& dir, Directions& directions)
     {
         return 0;
     }
-    else if (dir == directions.e)
+    else if (dir == directions.w)
     {
         return 1;
     }
