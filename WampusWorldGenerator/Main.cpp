@@ -32,7 +32,15 @@ bool isAttributeExist(vector<vector<Node>>& map, int cell, Node attribute)
     return false;
 }
 
-
+/// <summary>
+///     Добавление информации о текущем узле и его соседях
+/// </summary>
+/// <param name="map"> -- Карта, куда добавляется информация </param>
+/// <param name="cell"> -- Номер ячейки, относительно которой добавляется информация </param>
+/// <param name="central"> -- Информация об опорной клетке </param>
+/// <param name="child"> -- Информация о соседних клетках </param>
+/// <param name="nRows"> -- Длина поля </param>
+/// <param name="nColums"> -- Ширина поля </param>
 void addNodeToMap(vector<vector<Node>> &map, int cell, Node central, Node child, int nRows, int nColums)
 {
     map[cell].push_back(central);
@@ -187,4 +195,3 @@ int main()
 
     return 0;
 }
-

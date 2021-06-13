@@ -11,449 +11,83 @@
 #include "bdd.h"
 #include "Types.h"
 
-// TODO complete docs
-
 using namespace std;
 
+/// <summary>
+///     Название действия "движение вперёд"
+/// </summary>
 string FORWARD_STR    = "forward";
+
+/// <summary>
+///     Название действия "поворот налево"
+/// </summary>
 string TURN_LEFT_STR  = "turnLeft";
+
+/// <summary>
+///     Название действия "поворот направо"
+/// </summary>
 string TURN_RIGHT_STR = "turnRight";
 
+/// <summary>
+///     План действий для агента
+/// </summary>
 struct Plan
 {
+    /// <summary>
+    ///     Описание последовательности дествий в формате BDD
+    /// </summary>
     vector<bdd> bddPlan;
+
+    /// <summary>
+    ///     Описание последовательности действий в текстовом формате
+    /// </summary>
     vector<string> strPlan;
 };
-
 
 /// <summary>
 ///     Определение соседей относительно клетки cell
 /// </summary>
-/// <param name="cell"> -- номер ячейки, относительно которой  </param>
+/// <param name="cell"> -- номер ячейки, относительно которой определяются соседи </param>
 /// <param name="nRow"> -- длина поля </param>
 /// <param name="nColumn"> -- ширина поля </param>
-/// <returns></returns>
+/// <returns> Набор номеров соседних клеток </returns>
 vector<int> neighbourNodes(int cell, uint nRow, uint nColumn);
-
 
 /// <summary>
 ///     Проверка того что две клетки соседи
 /// </summary>
-/// <param name="cell"></param>
-/// <param name="probe"></param>
-/// <param name="nRow"></param>
-/// <param name="nColumn"></param>
-/// <returns></returns>
+/// <param name="cell"> -- номер ячейки, относительно которой идёт проверка потенциального соседа </param>
+/// <param name="probe"> -- номер ячейки, которую проверяют на соседство </param>
+/// <param name="nRow"> -- длина поля </param>
+/// <param name="nColumn"> -- ширина поля </param>
+/// <returns> истина, если соседи, иначе ложь </returns>
 bool isNeighbour(int cell, int probe, uint nRow, uint nColumn);
 
-
+/// <summary>
+///     Получениие плана действий для перехода между соседними клетками
+/// </summary>
+/// <param name="plan"> -- План, в который добавляются действия </param>
+/// <param name="currentDir"> -- Текущее направление агента </param>
+/// <param name="destDir"> -- Направление, куда надо смотреть для перехода </param>
+/// <param name="directions"> -- Переменная, описывающая направления движения </param>
+/// <param name="actions"> -- Переменная, описывающая действия  агента </param>
 void getNeighbourPlan(Plan& plan, bdd& currentDir, bdd& destDir, Directions& directions, TimeDependentActions& actions);
 
-
+/// <summary>
+///     Получение номера направления
+/// </summary>
+/// <param name="dir"> -- Направление, для которого нужно получить номер </param>
+/// <param name="directions"> -- Переменная, описывающая направления движения </param>
+/// <returns> 0 - север, 1 - запад, 2 - юг, 3 - восток </returns>
 int getDirId(bdd& dir, Directions& directions);
 
-//void find_path(stack <bdd>& plan, stack <string>& str_plan, bdd relation, bdd first_state, bdd* q, bdd* qq, bdd wished_state, vector<int> answer, vector<bdd> visited, bdd& direction)
-//{
-//    bool flag = false;
-//    bool dostijima = false;
-//    int dir;
-//    while (!flag && !dostijima)
-//    {
-//        bdd X_pr = first_state;
-//        bdd X_R = first_state & relation & wished_state;
-//
-//        for (int i = 0; i < 16; i++)
-//        {
-//
-//            if (to_stop_recursion == true)
-//                break;
-//            if ((X_R & qq[i]) != bddfalse && qq[i] == wished_state)
-//            {
-//                answer.push_back(i);
-//                dostijima = true;
-//                flag = true;
-//                visited.push_back(qq[i]);
-//                if (direction == n)
-//                    dir = 1;
-//                else if (direction == s)
-//                    dir = 2;
-//                else if (direction == e)
-//                    dir = 3;
-//                else if (direction == w)
-//                    dir = 4;
-//                switch (dir)
-//                {
-//                case 1: //север
-//                {
-//                    if ((X_R & qq[i] & direction) != bddfalse)
-//                    {
-//                        str_plan.push("forward");
-//                        plan.push(Forward_next);
-//                    }
-//
-//                    else if ((X_R & qq[i] & direction) == bddfalse)
-//                    {
-//                        if ((X_R & qq[i] & e) != bddfalse)
-//                        {
-//                            str_plan.push("turnRight");
-//                            plan.push(TurnRight_next);
-//                            str_plan.push("forward");
-//                            plan.push(Forward_next);
-//                            //direction = e;
-//                        }
-//                        else if ((X_R & qq[i] & w) != bddfalse)
-//                        {
-//                            str_plan.push("turnLeft");
-//                            plan.push(TurnLeft_next);
-//                            str_plan.push("forward");
-//                            plan.push(Forward_next);
-//                            //direction = w;
-//                        }
-//                        else if ((X_R & qq[i] & s) != bddfalse)
-//                        {
-//                            str_plan.push("turnLeft");
-//                            plan.push(TurnLeft_next);
-//                            str_plan.push("turnLeft");
-//                            plan.push(TurnLeft_next);
-//                            str_plan.push("forward");
-//                            plan.push(Forward_next);
-//                            //direction = s;
-//                        }
-//                    }
-//                } break;
-//                case 2: //юг
-//                {
-//                    if ((X_R & qq[i] & direction) != bddfalse)
-//                    {
-//                        str_plan.push("forward");
-//                        plan.push(Forward_next);
-//                    }
-//                    else if ((X_R & qq[i] & direction) == bddfalse)
-//                    {
-//                        if ((X_R & qq[i] & e) != bddfalse)
-//                        {
-//                            str_plan.push("turnLeft");
-//                            plan.push(TurnLeft_next);
-//                            str_plan.push("forward");
-//                            plan.push(Forward_next);
-//                            //direction = e;
-//                        }
-//                        else if ((X_R & qq[i] & w) != bddfalse)
-//                        {
-//                            str_plan.push("turnRight");
-//                            plan.push(TurnRight_next);
-//                            str_plan.push("forward");
-//                            plan.push(Forward_next);
-//                            //direction = w;
-//                        }
-//                        else if ((X_R & qq[i] & n) != bddfalse)
-//                        {
-//                            str_plan.push("turnLeft");
-//                            plan.push(TurnLeft_next);
-//                            str_plan.push("turnLeft");
-//                            plan.push(TurnLeft_next);
-//                            str_plan.push("forward");
-//                            plan.push(Forward_next);
-//                            //direction = n;
-//                        }
-//                    }
-//                } break;
-//                case 3: //восток
-//                {
-//                    if ((X_R & qq[i] & direction) != bddfalse)
-//                    {
-//                        str_plan.push("forward");
-//                        plan.push(Forward_next);
-//                    }
-//                    else if ((X_R & qq[i] & direction) == bddfalse)
-//                    {
-//                        if ((X_R & qq[i] & s) != bddfalse)
-//                        {
-//                            str_plan.push("turnRight");
-//                            plan.push(TurnRight_next);
-//                            str_plan.push("forward");
-//                            plan.push(Forward_next);
-//                            //direction = s;
-//                        }
-//                        else if ((X_R & qq[i] & n) != bddfalse)
-//                        {
-//                            str_plan.push("turnLeft");
-//                            plan.push(TurnLeft_next);
-//                            str_plan.push("forward");
-//                            plan.push(Forward_next);
-//                            //direction = n;
-//                        }
-//                        else if ((X_R & qq[i] & w) != bddfalse)
-//                        {
-//                            str_plan.push("turnLeft");
-//                            plan.push(TurnLeft_next);
-//                            str_plan.push("turnLeft");
-//                            plan.push(TurnLeft_next);
-//                            str_plan.push("forward");
-//                            plan.push(Forward_next);
-//                            //direction = w;
-//                        }
-//                    }
-//                } break;
-//                case 4: //запад
-//                {
-//                    if ((X_R & qq[i] & direction) != bddfalse)
-//                    {
-//                        str_plan.push("forward");
-//                        plan.push(Forward_next);
-//                    }
-//                    else if ((X_R & qq[i] & direction) == bddfalse)
-//                    {
-//                        if ((X_R & qq[i] & s) != bddfalse)
-//                        {
-//                            str_plan.push("turnLeft");
-//                            plan.push(TurnLeft_next);
-//                            str_plan.push("forward");
-//                            plan.push(Forward_next);
-//                            //direction = s;
-//                        }
-//                        else if ((X_R & qq[i] & n) != bddfalse)
-//                        {
-//                            str_plan.push("turnRight");
-//                            plan.push(TurnRight_next);
-//                            str_plan.push("forward");
-//                            plan.push(Forward_next);
-//                            //direction = n;
-//                        }
-//                        else if ((X_R & qq[i] & e) != bddfalse)
-//                        {
-//                            str_plan.push("turnLeft");
-//                            plan.push(TurnLeft_next);
-//                            str_plan.push("turnLeft");
-//                            plan.push(TurnLeft_next);
-//                            str_plan.push("forward");
-//                            plan.push(Forward_next);
-//                            //direction = e;
-//                        }
-//                    }
-//                }break;
-//                }
-//                //out.open("Route.txt", std::ios::app);
-//                //for (int k = 0; k < answer.size(); k++)
-//                //{
-//                //	cout << answer[k];
-//                //	out << answer[k];
-//                //}
-//                //out << endl;
-//                //out.close();
-//                //cout << endl;
-//                //break;
-//            }
-//            else if ((X_R & qq[i] & first_state) != bddfalse)
-//            {
-//                int j = 0;
-//                bool cflag = false;
-//                while (j < visited.size() && !cflag)
-//                {
-//                    if (qq[i] == visited[j])
-//                    {
-//                        cflag = true;
-//                    }
-//                    j++;
-//                }
-//                if (!cflag)
-//                {
-//                    if (direction == n)
-//                        dir = 1;
-//                    else if (direction == s)
-//                        dir = 2;
-//                    else if (direction == e)
-//                        dir = 3;
-//                    else if (direction == w)
-//                        dir = 4;
-//                    switch (dir)
-//                    {
-//                    case 1: //север
-//                    {
-//                        if ((X_R & qq[i] & direction) != bddfalse)
-//                        {
-//                            str_plan.push("forward");
-//                            plan.push(Forward_next);
-//                        }
-//
-//                        else if ((X_R & qq[i] & direction) == bddfalse)
-//                        {
-//                            if ((X_R & qq[i] & e) != bddfalse)
-//                            {
-//                                str_plan.push("turnRight");
-//                                plan.push(TurnRight_next);
-//                                str_plan.push("forward");
-//                                plan.push(Forward_next);
-//                                //direction = e;
-//                            }
-//                            else if ((X_R & qq[i] & w) != bddfalse)
-//                            {
-//                                str_plan.push("turnLeft");
-//                                plan.push(TurnLeft_next);
-//                                str_plan.push("forward");
-//                                plan.push(Forward_next);
-//                                //direction = w;
-//                            }
-//                            else if ((X_R & qq[i] & s) != bddfalse)
-//                            {
-//                                str_plan.push("turnLeft");
-//                                plan.push(TurnLeft_next);
-//                                str_plan.push("turnLeft");
-//                                plan.push(TurnLeft_next);
-//                                str_plan.push("forward");
-//                                plan.push(Forward_next);
-//                                //direction = s;
-//                            }
-//                        }
-//                    } break;
-//                    case 2: //юг
-//                    {
-//                        if ((X_R & qq[i] & direction) != bddfalse)
-//                        {
-//                            str_plan.push("forward");
-//                            plan.push(Forward_next);
-//                        }
-//                        else if ((X_R & qq[i] & direction) == bddfalse)
-//                        {
-//                            if ((X_R & qq[i] & e) != bddfalse)
-//                            {
-//                                str_plan.push("turnLeft");
-//                                plan.push(TurnLeft_next);
-//                                str_plan.push("forward");
-//                                plan.push(Forward_next);
-//                                //direction = e;
-//                            }
-//                            else if ((X_R & qq[i] & w) != bddfalse)
-//                            {
-//                                str_plan.push("turnRight");
-//                                plan.push(TurnRight_next);
-//                                str_plan.push("forward");
-//                                plan.push(Forward_next);
-//                                //direction = w;
-//                            }
-//                            else if ((X_R & qq[i] & n) != bddfalse)
-//                            {
-//                                str_plan.push("turnLeft");
-//                                plan.push(TurnLeft_next);
-//                                str_plan.push("turnLeft");
-//                                plan.push(TurnLeft_next);
-//                                str_plan.push("forward");
-//                                plan.push(Forward_next);
-//                                //direction = n;
-//                            }
-//                        }
-//                    } break;
-//                    case 3: //восток
-//                    {
-//                        if ((X_R & qq[i] & direction) != bddfalse)
-//                        {
-//                            str_plan.push("forward");
-//                            plan.push(Forward_next);
-//                        }
-//                        else if ((X_R & qq[i] & direction) == bddfalse)
-//                        {
-//                            if ((X_R & qq[i] & s) != bddfalse)
-//                            {
-//                                str_plan.push("turnRight");
-//                                plan.push(TurnRight_next);
-//                                str_plan.push("forward");
-//                                plan.push(Forward_next);
-//                                //direction = s;
-//                            }
-//                            else if ((X_R & qq[i] & n) != bddfalse)
-//                            {
-//                                str_plan.push("turnLeft");
-//                                plan.push(TurnLeft_next);
-//                                str_plan.push("forward");
-//                                plan.push(Forward_next);
-//                                //direction = n;
-//                            }
-//                            else if ((X_R & qq[i] & w) != bddfalse)
-//                            {
-//                                str_plan.push("turnLeft");
-//                                plan.push(TurnLeft_next);
-//                                str_plan.push("turnLeft");
-//                                plan.push(TurnLeft_next);
-//                                str_plan.push("forward");
-//                                plan.push(Forward_next);
-//                                //direction = w;
-//                            }
-//                        }
-//                    } break;
-//                    case 4: //запад
-//                    {
-//                        if ((X_R & qq[i] & direction) != bddfalse)
-//                        {
-//                            str_plan.push("forward");
-//                            plan.push(Forward_next);
-//                        }
-//                        else if ((X_R & qq[i] & direction) == bddfalse)
-//                        {
-//                            if ((X_R & qq[i] & s) != bddfalse)
-//                            {
-//                                str_plan.push("turnLeft");
-//                                plan.push(TurnLeft_next);
-//                                str_plan.push("forward");
-//                                plan.push(Forward_next);
-//                                //direction = s;
-//                            }
-//                            else if ((X_R & qq[i] & n) != bddfalse)
-//                            {
-//                                str_plan.push("turnRight");
-//                                plan.push(TurnRight_next);
-//                                str_plan.push("forward");
-//                                plan.push(Forward_next);
-//                                //direction = n;
-//                            }
-//                            else if ((X_R & qq[i] & e) != bddfalse)
-//                            {
-//                                str_plan.push("turnLeft");
-//                                plan.push(TurnLeft_next);
-//                                str_plan.push("turnLeft");
-//                                plan.push(TurnLeft_next);
-//                                str_plan.push("forward");
-//                                plan.push(Forward_next);
-//                                //direction = e;
-//                            }
-//                        }
-//                    }break;
-//                    }
-//                    for (int j = 0; j < 9; j++)
-//                    {
-//                        if ((relation & q[i] & qq[j]) != bddfalse)
-//                        {
-//                            bool kflag = false;
-//                            int k = 0;
-//                            while (k < visited.size() && !kflag)
-//                            {
-//                                if (qq[j] == visited[k])
-//                                {
-//                                    kflag = true;
-//                                }
-//                                k++;
-//                            }
-//                            if (!kflag)
-//                            {
-//                                visited.push_back(qq[i]);
-//                                answer.push_back(i);
-//                                find_path(plan, str_plan, relation, q[i], q, qq, wished_state, answer, visited, direction);
-//                                break;
-//                            }
-//                        }
-//                    }
-//                }
-//            }
-//        }
-//        if (X_pr == first_state)
-//        {
-//            flag = true;
-//            to_stop_recursion = true;
-//        }
-//        else X_pr = first_state;
-//    }
-//}
-//
-
+/// <summary>
+///     Эвристическая функция оценки стоимости достижения узла
+/// </summary>
+/// <param name="cur"> -- Текущий номер узла </param>
+/// <param name="dest"> -- Номер конечного узла </param>
+/// <param name="nColumn"> -- ширина поля </param>
+/// <returns> числовое значение  </returns>
 uint hDist(int cur, int dest, int nColumn)
 {
     int width = abs(cur % nColumn - dest % nColumn);
@@ -476,6 +110,9 @@ uint hDist(int cur, int dest, int nColumn)
 /// <param name="nColumn"> -- Ширина поля </param>
 /// <param name="fValues"> -- Массив с преподсчитанными значениями функции оценки </param>
 /// <param name="iniDir"> -- начальное направление агента </param>
+void findPathAstar(Plan& plan, int startNodeNum, bdd& relation, int endNodeNum, vector<bool>& safeCells, vector<bdd>& q, vector<bdd>& qq, uint nRow, uint nColumn, vector<bdd>& fValues, bdd& iniDir, Directions& directions, TimeDependentActions& actions);
+
+
 void findPathAstar(Plan& plan, int startNodeNum, bdd& relation, int endNodeNum, vector<bool>& safeCells, vector<bdd>& q, vector<bdd>& qq, uint nRow, uint nColumn, vector<bdd>& fValues, bdd& iniDir, Directions& directions, TimeDependentActions& actions)
 {
     uint nodeCount = nRow * nColumn;

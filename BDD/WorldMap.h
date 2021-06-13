@@ -32,32 +32,37 @@ enum class Node : int
 // Т.к. на одной клетке могут быть несколько свойств, возможно 
 // лучше их как-то отдельно кодировать, чтобы на карте был всегда один номер
 
+/// <summary>
+///     Карта мира Вампуса
+/// </summary>
 struct Map 
 {
+    /// <summary>
+    ///     Опиисание пещеры
+    /// </summary>
     vector <vector<Node>> cave;
+    
+    /// <summary>
+    ///     Длина поля
+    /// </summary>
     uint nRow;
+    
+    /// <summary>
+    ///     Ширина поля
+    /// </summary>
     uint nColumn;
+    
+    /// <summary>
+    ///     Общее количество ячеек (nRow * nColumn)
+    /// </summary>
     uint n;
 };
 
-////карта 4х4
-//vector<std::vector<int>> real_cave2 = { {1},     {0},  {33}, {3},
-//                                        {0},     {33}, {3},  {33},
-//                                        {0},     {22}, {33}, {0},
-//                                        {4, 22}, {2},  {22}, {0}};
-
-// карта 4х4
-//vector<std::vector<Node>> real_cave2 = {{Node::AGENT},              {Node::NONE},   {Node::BREEZE}, {Node::PIT},
-//                                        {Node::NONE},               {Node::BREEZE}, {Node::PIT},    {Node::BREEZE},
-//                                        {Node::NONE},               {Node::STENCH}, {Node::BREEZE}, {Node::NONE},
-//                                        {Node::GOLD, Node::STENCH}, {Node::WUMPUS}, {Node::STENCH}, {Node::NONE} };
-
-//карта 3х3
-//vector<std::vector<Node>> real_cave3 = { {Node::Agent},  {Node::Breeze}, {Node::Pit},
-//                                         {Node::Breeze}, {Node::None},   {Node::Breeze, Node::Gold},
-//                                         {Node::Pit},    {Node::Breeze}, {Node::Pit, Node::Wumpus}};
-
-
+/// <summary>
+///     Преобразование числа к типу Node
+/// </summary>
+/// <param name="val"> -- Число, которое соответствует какому-то признаку у Node </param>
+/// <returns> Соответсвущее значение в типе Node, если числе нельзя преобразовать возвращается Node::NONE </returns>
 Node intToNode(int val)
 {
     switch (val)
@@ -93,7 +98,7 @@ Node intToNode(int val)
 /// </summary>
 /// <param name="path"> -- Путь к файлу, описывающий пещеру </param>
 /// <returns>
-///     Заполенная карта 
+///     Заполенная карта
 /// </returns>
 Map readMap(string path)
 {
@@ -128,10 +133,10 @@ Map readMap(string path)
 /// <summary>
 ///     Вывод карты
 /// </summary>
-/// <param name="map"></param>
-/// <param name="out"></param>
-/// <param name="nColumn"></param>
-/// <param name="nRow"></param>
+/// <param name="map"> -- Описание карты для вывода </param>
+/// <param name="out"> -- Поток, куда выводиться информация о карте </param>
+/// <param name="nColumn"> -- Ширина поля </param>
+/// <param name="nRow"> -- Длина поля </param>
 void printMap(vector<vector<Node>> map, uint nColumn, uint nRow, ostream& out = cout)
 {
     bool gold_flag = false;

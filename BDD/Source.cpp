@@ -21,60 +21,57 @@ using namespace std;
 
 ofstream out;
 
-//N_DEPEND_ON_CELL*N_COLUMN*N_ROW+N_NOT_DEPEND_ON_CELL+18
-//#define N_DEPEND_ON_CELL 9
-//#define N_NOT_DEPEND_ON_CELL 18
+// TODO добавить readme
+// TODO добавить класс для работы с bdd. Через него должна происходить инициализация переменных (обращение к ithvar()).
+// TODO подумать над взаимодействием поворотов и напралений (может быть их можно как-то связать с bdd и логическим выводом?)
+// TODO добавить модуль проверяющий правильность поведения агента. По логам мы определяем может ли агент совершить то или иное действие
+// TODO разделить логирование случая нахождения золота и случая, когдпа безопасный путь найти нельзя
+
+constexpr int DEPEND_ON_NODE_VAR_COUNT = 11; // TODO показать из каких значений состоит
+constexpr int INDEPEND_FROM_NODE_VAR_COUNT = 30; // TODO показать из каких значений состоит
 
 //#define N_FUNCTIONS_AT_CELL (3 + 14*4)
 //#define N_FUNCTIONS_IN_FIELD (4 + 3*4) // до percept здесь было 4+3*2 (???)
 
-constexpr int DEPEND_ON_NODE_VAR_COUNT = 11; // TODO показать из каких значений состоит
-constexpr int INDEPEND_FROM_NODE_VAR_COUNT = 30; // TODO 
-
 constexpr int NUMS_FOR_DIR = 2;
 
-//constexpr int N_VAR = 207 + NUMS_FOR_F_VAL + 2 * NUMS_FOR_NODE_VAL + NUMS_FOR_DIR;
-
 Map mapInfo;
-
-// TODO добавить класс для работы с bdd. Через него должна происходить инициализация переменных.
-
-// TODO подумать над взаимодействием поворотов и напралений (может быть их можно как-то связать?)
 
 /// <summary>
 ///     прохожусь по соседям клетки, смотри те, которые еще не проверены, отправляю их на проверку
 /// </summary>
-/// <param name="task"></param>
-/// <param name="current_cell"></param>
-/// <returns></returns>
+/// <param name="task"> -- Текущая база знаний </param>
+/// <param name="current_cell"> -- Номер ячейкий, относительно которой идёт поиск </param>
+/// <returns> Номер одной из непосещённых ячеек </returns>
 int find_unvisited(bdd task, int current_cell);
 
 /// <summary>
-///     из i-ой клетки достает восприятие (percept)
+///     Получение восприятия (percept) из указанной клетки
 /// </summary>
-/// <param name="Enviroment"></param>
-/// <param name="current_cell"></param>
+/// <param name="Enviroment"> -- Карта мира </param>
+/// <param name="current_cell"> -- Номер текущей ячейки </param>
 /// <returns></returns>
 bdd ask_and_send_percept(vector<vector <Node>> Enviroment, int current_cell);
 
 /// <summary>
-///     проверяет клетку на безопасность
+///     Проверка клетки на безопасность
 /// </summary>
-/// <param name="task"></param>
-/// <param name="current_cell"></param>
+/// <param name="task"> -- Текущая база знаний </param>
+/// <param name="current_cell"> -- Текущий номер ячейки </param>
 /// <returns></returns>
 int check_for_safety(bdd task, int current_cell, ostream& out);
 
 /// <summary>
-///     сочетает две функции: поиск соседей и проверку на безопасность
+///     Поиск безопасных соседних клеток
 /// </summary>
-/// <param name="task"></param>
-/// <param name="current_cell"></param>
-/// <returns></returns>
+/// <param name="task"> -- Текущая база знаний </param>
+/// <param name="current_cell"> --  </param>
+/// <param name="out"> -- Поток вывода для логов </param>
+/// <returns> Номер безопасной клетки </returns>
 int Enviroment(bdd task, int current_cell, ostream& out);
 
 /// <summary>
-/// 
+///     Функция поиска пути (неточно)
 /// </summary>
 /// <param name="plan"> -- Стек содержащий последовательность действий для достижения цели </param>
 /// <param name="str_plan"> -- Стек содержащий последовательность действий для достижения цели в текстовой форме </param>
@@ -83,9 +80,9 @@ int Enviroment(bdd task, int current_cell, ostream& out);
 /// <param name="q"> -- Вектор обычных вершин (набор вершин в текущий момент времени) </param>
 /// <param name="qq"> -- Вектор штрифованных вершин (набор вершин в следующий момент времени) </param>
 /// <param name="wished_state"> -- Узел в который хочется прийти (штрихованная вершина) </param>
-/// <param name="answer"></param>
-/// <param name="visited"></param>
-/// <param name="direction"></param>
+/// <param name="answer"> -- Набор вершин по которым надо совершить переход </param>
+/// <param name="visited"> -- Вектор посещённых вершин (неточно) </param>
+/// <param name="direction"> -- Направление куда смотрит агент в текущий момент времени </param>
 /// <param name="actionsNext"> -- Описание действий для перемещения </param>
 /// <param name="directions"> -- Направления движения </param>
 void find_path(stack <bdd> &plan, stack <string> &str_plan,
@@ -95,13 +92,25 @@ void find_path(stack <bdd> &plan, stack <string> &str_plan,
                Directions &directions);
 
 /// <summary>
-/// 
+///     Совершение агентом действий на карте
 /// </summary>
-/// <param name="cell"></param>
-/// <param name="action"></param>
-/// <param name="direction"></param>
-/// <returns></returns>
+/// <param name="cell"> -- Номер текущей ячейки </param>
+/// <param name="action"> -- Название действия </param>
+/// <param name="direction"> -- Текущее направление </param>
+/// <param name="directions"> -- Направления движения </param>
+/// <returns> Номер ячейки после совершения действия </returns>
 int move(int cell, string action, bdd& direction, Directions& dir);
+
+/// <summary>
+///     Запуск агента
+/// </summary>
+/// <param name="filePath"> -- Путь до файла с картой </param>
+/// <param name="isAstarUse"> -- При поиске обратного пути использовать A* </param>
+/// <param name="out"> -- Поток для вывода логов </param>
+/// <param name="isFullRun"> -- Флаг показывающий, полный запуск агента или только проверка алгоритма поиска пути </param>
+/// <returns> Время работы в микросекундах </returns>
+lint runAgent(string filePath, bool isAstarUse, ostream& out, bool isFullRun);
+
 
 //переменные восприятия среды
 bdd Stench; // ощущение агентом 
@@ -194,18 +203,6 @@ stack<int> cells; //стек для хранения предыдущей клетки
 // флаги для символьных вычислений
 bool flag = false;
 bool to_stop_recursion;
-
-lint runAgent(string filePath, bool isAstarUse, ostream& out, bool isFullRun);
-
-uint log_2(int n)
-{
-    uint val = 1;
-    while ((1 << val) < n)
-    {
-        ++val;
-    }
-    return val;
-}
 
 int main()
 {
@@ -360,49 +357,41 @@ lint runAgent(string filePath, bool isAstarUse, ostream& out, bool isFullRun)
         // для Вампуса
         for (int i = 0; i < mapInfo.n; i++)
         {
-            W[i] = bdd_ithvar(countvar);
-            countvar++;
+            W[i] = bdd_ithvar(countvar++);
         }
 
         // для запаха
         for (int i = 0; i < mapInfo.n; i++)
         {
-            S[i] = bdd_ithvar(countvar);
-            countvar++;
+            S[i] = bdd_ithvar(countvar++);
         }
 
         //для ям
         for (int i = 0; i < mapInfo.n; i++)
         {
-            P[i] = bdd_ithvar(countvar);
-            countvar++;
+            P[i] = bdd_ithvar(countvar++);
         }
 
         //для ветра
         for (int i = 0; i < mapInfo.n; i++)
         {
-            B[i] = bdd_ithvar(countvar);
-            countvar++;
+            B[i] = bdd_ithvar(countvar++);
         }
 
         // Для золота
         for (int i = 0; i < mapInfo.n; i++)
         {
-            G[i] = bdd_ithvar(countvar);
-            countvar++;
+            G[i] = bdd_ithvar(countvar++);
         }
 
         //для Stench (запах)
-        Stench = bdd_ithvar(countvar);
-        countvar++;
+        Stench = bdd_ithvar(countvar++);
 
         //для Breeze (ветер)
-        Breeze = bdd_ithvar(countvar);
-        countvar++;
-
-        //для Scream
-        Scream = bdd_ithvar(countvar);
-        countvar++;
+        Breeze = bdd_ithvar(countvar++);
+        
+        //для Scream (???)
+        Scream = bdd_ithvar(countvar++);
     }
 
     // Динамика
@@ -411,71 +400,44 @@ lint runAgent(string filePath, bool isAstarUse, ostream& out, bool isFullRun)
         // для нахождения агента в клетке
         for (int i = 0; i < mapInfo.n; i++)
         {
-            L[i] = bdd_ithvar(countvar);
-            countvar++;
+            L[i] = bdd_ithvar(countvar++);
         }
 
         // для посещение клетки агентом
         for (int i = 0; i < mapInfo.n; i++)
         {
-            V[i] = bdd_ithvar(countvar);
-            countvar++;
+            V[i] = bdd_ithvar(countvar++);
         }
 
         //для безопасной клетки
         for (int i = 0; i < mapInfo.n; i++)
         {
-            OK[i] = bdd_ithvar(countvar);
-            countvar++;
+            OK[i] = bdd_ithvar(countvar++);
         }
 
         //для стрелы
-        HaveArrow = bdd_ithvar(countvar); //есть стрела в текущей клетке
-        countvar++;
+        HaveArrow = bdd_ithvar(countvar++); //есть стрела в текущей клетке
 
         //для того что Вампус жив
-        WumpusAlive = bdd_ithvar(countvar);
-        countvar++;
+        WumpusAlive = bdd_ithvar(countvar++);
 
         //для направлений
-        East = bdd_ithvar(countvar);
-        countvar++;
-
-        South = bdd_ithvar(countvar);
-        countvar++;
-
-        West = bdd_ithvar(countvar);
-        countvar++;
-
-        North = bdd_ithvar(countvar);
-        countvar++;
+        East = bdd_ithvar(countvar++);
+        South = bdd_ithvar(countvar++);
+        West = bdd_ithvar(countvar++);
+        North = bdd_ithvar(countvar++);
 
         //для действий (форвард, тёрнлефт, тёрнрайт)
-        Forward = bdd_ithvar(countvar);
-        countvar++;
-
-        TurnLeft = bdd_ithvar(countvar);
-        countvar++;
-
-        TurnRight = bdd_ithvar(countvar);
-        countvar++;
-
-        Grab = bdd_ithvar(countvar);
-        countvar++;
-
-        Climb = bdd_ithvar(countvar);
-        countvar++;
-
-        Shoot = bdd_ithvar(countvar);
-        countvar++;
+        Forward = bdd_ithvar(countvar++);
+        TurnLeft = bdd_ithvar(countvar++);
+        TurnRight = bdd_ithvar(countvar++);
+        Grab = bdd_ithvar(countvar++);
+        Climb = bdd_ithvar(countvar++);
+        Shoot = bdd_ithvar(countvar++);
 
         //для состояний агента (золото, вылез ли из пещеры?)
-
-        ClimbedOut = bdd_ithvar(countvar);
-        countvar++;
-
-        HaveGold = bdd_ithvar(countvar);
-        countvar++;
+        ClimbedOut = bdd_ithvar(countvar++);
+        HaveGold = bdd_ithvar(countvar++);
     }
 
     // ПЕРЕМЕННЫЕ ДЛЯ СЛЕДУЮЩЕГО СОСТОЯНИЯ
@@ -484,41 +446,29 @@ lint runAgent(string filePath, bool isAstarUse, ostream& out, bool isFullRun)
     {
         for (int i = 0; i < mapInfo.n; i++)
         {
-            L_next[i] = bdd_ithvar(countvar);
-            countvar++;
+            L_next[i] = bdd_ithvar(countvar++);
         }
 
         for (int i = 0; i < mapInfo.n; i++)
         {
-            V_next[i] = bdd_ithvar(countvar);
-            countvar++;
+            V_next[i] = bdd_ithvar(countvar++);
         }
 
         for (int i = 0; i < mapInfo.n; i++)
         {
-            OK_next[i] = bdd_ithvar(countvar);
-            countvar++;
+            OK_next[i] = bdd_ithvar(countvar++);
         }
 
-        HaveArrow_next = bdd_ithvar(countvar); //нет стрелы
-        countvar++;
+        HaveArrow_next = bdd_ithvar(countvar++); //нет стрелы
 
         //для того что Вампус жив
-        WumpusAlive_next = bdd_ithvar(countvar);
-        countvar++;
+        WumpusAlive_next = bdd_ithvar(countvar++);
 
         //для направлений
-        East_next = bdd_ithvar(countvar);
-        countvar++;
-
-        South_next = bdd_ithvar(countvar);
-        countvar++;
-
-        West_next = bdd_ithvar(countvar);
-        countvar++;
-
-        North_next = bdd_ithvar(countvar);
-        countvar++;
+        East_next = bdd_ithvar(countvar++);
+        South_next = bdd_ithvar(countvar++);
+        West_next = bdd_ithvar(countvar++);
+        North_next = bdd_ithvar(countvar++);
 
         //для действий (форвард, тёрнлефт, тёрнрайт)
         actionsNext.Forward = bdd_ithvar(countvar++);
@@ -534,12 +484,8 @@ lint runAgent(string filePath, bool isAstarUse, ostream& out, bool isFullRun)
         actionsNext.Shoot = Shoot_next;
 
         //для состояний агента (золото, вылез ли из пещеры?)
-
-        ClimbedOut_next = bdd_ithvar(countvar);
-        countvar++;
-
-        HaveGold_next = bdd_ithvar(countvar);
-        countvar++;
+        ClimbedOut_next = bdd_ithvar(countvar++);
+        HaveGold_next = bdd_ithvar(countvar++);
     }
 
     // Переменные для функции оценки
@@ -779,12 +725,6 @@ lint runAgent(string filePath, bool isAstarUse, ostream& out, bool isFullRun)
 
     // направления, куда смотрит агент, для символьных вычислений
     Directions dirs;
-
-    //dirs.n = !x[NUMS_FOR_NODE_VAL * 2] & !x[NUMS_FOR_NODE_VAL * 2 + 1]; // 00
-    //dirs.s = !x[NUMS_FOR_NODE_VAL * 2] & x[NUMS_FOR_NODE_VAL * 2 + 1];  // 01
-    //dirs.e = x[NUMS_FOR_NODE_VAL * 2] & !x[NUMS_FOR_NODE_VAL * 2 + 1];  // 10
-    //dirs.w = x[NUMS_FOR_NODE_VAL * 2] & x[NUMS_FOR_NODE_VAL * 2 + 1];   // 11
-
     dirs.n = !bdd_ithvar(countvar) & !bdd_ithvar(countvar + 1); // 00
     dirs.s = !bdd_ithvar(countvar) & bdd_ithvar(countvar + 1);  // 01
     dirs.e = bdd_ithvar(countvar) & !bdd_ithvar(countvar + 1);  // 10
@@ -844,7 +784,7 @@ lint runAgent(string filePath, bool isAstarUse, ostream& out, bool isFullRun)
     {
 
         bool gold_flag = false;
-        // Ходим по полю, пока не найдём золото
+        // Ходим по полю, пока не найдём золото или не будет ячеек, которые можно безопасно разведать
         while (gold_flag != true)
         {
             out << "Current cell is " << current_cell << endl;
@@ -896,7 +836,6 @@ lint runAgent(string filePath, bool isAstarUse, ostream& out, bool isFullRun)
                 out << "Current cell is " << current_cell << endl;
             }
         }
-
     }
 
     if (!isFullRun)
@@ -937,7 +876,7 @@ lint runAgent(string filePath, bool isAstarUse, ostream& out, bool isFullRun)
             out << "Current cell is " << current_cell << endl;
         }
     }
-    // Используем Сонину реализацию
+    // Используем старую Сонину реализацию
     else
     {
         int startCell = current_cell;
@@ -1020,55 +959,52 @@ lint runAgent(string filePath, bool isAstarUse, ostream& out, bool isFullRun)
     return microsec.count();
 }
 
-//проверка клетки на безопасность
-int check_for_safety(bdd task, int current_cell, ostream& out) //проверка клетки на безопасность
+int check_for_safety(bdd task, int current_cell, ostream& out)
 {
-	int cell_to_go_next;
-	if ((task & !OK[current_cell]) == bddfalse) //если она безопасна
-	{
-		cell_to_go_next = current_cell; //говорю, что хочу пойти в эту клетку
-		checked_cells[current_cell] = true; //говорю, что проверила эту клетку
-		safe_cells[current_cell] = true; //говорю, что эта клетка безопасна
-		flag = true;
-	}
-	else if ((task & OK[current_cell]) == bddfalse) //опасна
-	{
-		not_safe_cells[current_cell] = true; //говорим, что это клетка опасна
-		checked_cells[current_cell] = true;
-		cell_to_go_next = cells.top();
-		if ((task &= !P[current_cell]) == bddfalse)
-			out << "In cell " << current_cell << " is Pit!" << endl;
-		else if ((task &= !W[current_cell]) == bddfalse)
-			out << "In cell " << current_cell << " is Wumpus!" << endl;
-	}
-	else //если неизвстна
-	{
-		unknown_cells[current_cell] = true; //говорим, что небезопасна
-		//checked_cells[current_cell] = true; //добавляем в массив проверенных
-		cell_to_go_next = cells.top();
-	}
-	return cell_to_go_next;
+    int cell_to_go_next;
+    if ((task & !OK[current_cell]) == bddfalse) //если она безопасна
+    {
+        cell_to_go_next = current_cell; //говорю, что хочу пойти в эту клетку
+        checked_cells[current_cell] = true; //говорю, что проверила эту клетку
+        safe_cells[current_cell] = true; //говорю, что эта клетка безопасна
+        flag = true;
+    }
+    else if ((task & OK[current_cell]) == bddfalse) //опасна
+    {
+        not_safe_cells[current_cell] = true; //говорим, что это клетка опасна
+        checked_cells[current_cell] = true;
+        cell_to_go_next = cells.top();
+        if ((task &= !P[current_cell]) == bddfalse)
+            out << "In cell " << current_cell << " is Pit!" << endl;
+        else if ((task &= !W[current_cell]) == bddfalse)
+            out << "In cell " << current_cell << " is Wumpus!" << endl;
+    }
+    else //если неизвстна
+    {
+        unknown_cells[current_cell] = true; //говорим, что небезопасна
+        //checked_cells[current_cell] = true; //добавляем в массив проверенных
+        cell_to_go_next = cells.top();
+    }
+    return cell_to_go_next;
 }
 
-//прохожусь по соседям клетки, смотри те, которые еще не проверены, отправляю их на проверку
 int find_unvisited(bdd task, int current_cell) 
 {
-	vector <int> neighbours_of_cell = neighbourNodes(current_cell, mapInfo.nRow, mapInfo.nColumn);
+    vector <int> neighbours_of_cell = neighbourNodes(current_cell, mapInfo.nRow, mapInfo.nColumn);
 
-	for (int i = 0; i < neighbours_of_cell.size(); i++)
-	{
-		int check_if_safe = neighbours_of_cell[i];
-		if (checked_cells[check_if_safe] == false)
-		{
-			cells.push(current_cell);
-			current_cell = check_if_safe;
-			break;
-		}
-	}
-	return current_cell;
+    for (int i = 0; i < neighbours_of_cell.size(); i++)
+    {
+        int check_if_safe = neighbours_of_cell[i];
+        if (checked_cells[check_if_safe] == false)
+        {
+            cells.push(current_cell);
+            current_cell = check_if_safe;
+            break;
+        }
+    }
+    return current_cell;
 }
 
-// в текущей клетке беру percept
 bdd ask_and_send_percept(vector<vector<Node>> Enviroment, int current_cell) 
 {
     {
@@ -1097,95 +1033,94 @@ bdd ask_and_send_percept(vector<vector<Node>> Enviroment, int current_cell)
 
 int Enviroment(bdd task, int current_cell, ostream& out)
 {
-	int cell_to_check;
-	int got_unsafe_cell;
-	int count = 0;
+    int cell_to_check;
+    int got_unsafe_cell;
+    int count = 0;
 
-	cell_to_check = find_unvisited(task, current_cell); //ближайшая непосещенная клетка, которую можно проверить на безопасность
-	cell_to_check = check_for_safety(task, cell_to_check, out); //проверка на безопасность
+    cell_to_check = find_unvisited(task, current_cell); //ближайшая непосещенная клетка, которую можно проверить на безопасность
+    cell_to_check = check_for_safety(task, cell_to_check, out); //проверка на безопасность
 
-	if (cell_to_check == current_cell)
-	{
-		vector<int> neighb = neighbourNodes(current_cell, mapInfo.nRow, mapInfo.nColumn);
-		for (int i = 0; i < neighb.size(); i++)
-			if (checked_cells[neighb[i]] == true)
-			{
-				count++;
-			}
-		if (count == neighb.size())
-		{
-			for (int i = 0; i < neighb.size(); i++)
-			{
-				if (safe_cells[neighb[i]] == true)
-					return got_unsafe_cell = neighb[i];
-			}
-		}
-		else if (unknown_cells[find_unvisited(task, current_cell)] == true)
-		{
-			for (int i = 0; i < neighb.size(); i++)
-			{
-				if (unknown_cells[neighb[i]] == false && checked_cells[neighb[i]] == false)
-				{
-					return cell_to_check = check_for_safety(task, neighb[i], out);
-				}
-			}
-		}
-		if (cell_to_check == current_cell)
-		{
-			for (int i = 0; i < neighb.size(); i++)
-			{
-				if (safe_cells[neighb[i]] == true)
-					return got_unsafe_cell = neighb[i];
-			}
-		}
-	}
-	else if (flag == true)
-	{
-		checked_cells[cell_to_check] = true;
-		return cell_to_check;
-	}
+    if (cell_to_check == current_cell)
+    {
+        vector<int> neighb = neighbourNodes(current_cell, mapInfo.nRow, mapInfo.nColumn);
+        for (int i = 0; i < neighb.size(); i++)
+            if (checked_cells[neighb[i]] == true)
+            {
+                count++;
+            }
+        if (count == neighb.size())
+        {
+            for (int i = 0; i < neighb.size(); i++)
+            {
+                if (safe_cells[neighb[i]] == true)
+                    return got_unsafe_cell = neighb[i];
+            }
+        }
+        else if (unknown_cells[find_unvisited(task, current_cell)] == true)
+        {
+            for (int i = 0; i < neighb.size(); i++)
+            {
+                if (unknown_cells[neighb[i]] == false && checked_cells[neighb[i]] == false)
+                {
+                    return cell_to_check = check_for_safety(task, neighb[i], out);
+                }
+            }
+        }
+        if (cell_to_check == current_cell)
+        {
+            for (int i = 0; i < neighb.size(); i++)
+            {
+                if (safe_cells[neighb[i]] == true)
+                    return got_unsafe_cell = neighb[i];
+            }
+        }
+    }
+    else if (flag == true)
+    {
+        checked_cells[cell_to_check] = true;
+        return cell_to_check;
+    }
 }
 
-//функция для передвижения
 int move(int cell, string action, bdd &direction, Directions &dir)
 {
-	if (direction == dir.n)
-	{
-		if (action == "forward")
-			cell = cell - mapInfo.nRow;
-		else if (action == "turnLeft")
-			direction = dir.w;
-		else if (action == "turnRight")
-			direction = dir.e;
-	}
-	else if (direction == dir.s)
-	{
-		if (action == "forward")
-			cell = cell + mapInfo.nRow;
-		else if (action == "turnLeft")
-			direction = dir.e;
-		else if (action == "turnRight")
-			direction = dir.w;
-	}
-	else if (direction == dir.e)
-	{
-		if (action == "forward")
-			cell = cell + 1;
-		else if (action == "turnLeft")
-			direction = dir.n;
-		else if (action == "turnRight")
-			direction = dir.s;
-	}
-	else if (direction == dir.w)
-	{
-		if (action == "forward")
-			cell = cell -1;
-		else if (action == "turnLeft")
-			direction = dir.s;
-		else if (action == "turnRight")
-			direction = dir.n;
-	}
-	return cell;
+    if (direction == dir.n)
+    {
+        if (action == "forward")
+            cell = cell - mapInfo.nRow;
+        else if (action == "turnLeft")
+            direction = dir.w;
+        else if (action == "turnRight")
+            direction = dir.e;
+    }
+    else if (direction == dir.s)
+    {
+        if (action == "forward")
+            cell = cell + mapInfo.nRow;
+        else if (action == "turnLeft")
+            direction = dir.e;
+        else if (action == "turnRight")
+            direction = dir.w;
+    }
+    else if (direction == dir.e)
+    {
+        if (action == "forward")
+            cell = cell + 1;
+        else if (action == "turnLeft")
+            direction = dir.n;
+        else if (action == "turnRight")
+            direction = dir.s;
+    }
+    else if (direction == dir.w)
+    {
+        if (action == "forward")
+            cell = cell -1;
+        else if (action == "turnLeft")
+            direction = dir.s;
+        else if (action == "turnRight")
+            direction = dir.n;
+    }
+    return cell;
 }
 
 // Увы, я не могу понять, какова цель этой функции 
@@ -1200,403 +1135,403 @@ void find_path(stack <bdd>& plan, stack <string>& str_plan,
     bool dostijima = false;
     int dir;
 
-	while (!flag && !dostijima)
-	{
-		bdd X_pr = first_state;
-		bdd X_R = first_state & relation & wished_state;
+    while (!flag && !dostijima)
+    {
+        bdd X_pr = first_state;
+        bdd X_R = first_state & relation & wished_state;
 
-		for (int i = 0; i < 16; i++)
-		{
+        for (int i = 0; i < 16; i++)
+        {
 
-			if (to_stop_recursion == true)
-				break;
+            if (to_stop_recursion == true)
+                break;
 
             // если мы можем осуществить переход за один шаг в конечную вершину ???
-			if ((X_R & qq[i]) != bddfalse && qq[i] == wished_state)
-			{
-				answer.push_back(i);
-				dostijima = true;
-				flag = true;
-				visited.push_back(qq[i]);
-				if (direction == directions.n)
-					dir = 1;
-				else if (direction == directions.s)
-					dir = 2;
-				else if (direction == directions.e)
-					dir = 3;
-				else if (direction == directions.w)
-					dir = 4;
+            if ((X_R & qq[i]) != bddfalse && qq[i] == wished_state)
+            {
+                answer.push_back(i);
+                dostijima = true;
+                flag = true;
+                visited.push_back(qq[i]);
+                if (direction == directions.n)
+                    dir = 1;
+                else if (direction == directions.s)
+                    dir = 2;
+                else if (direction == directions.e)
+                    dir = 3;
+                else if (direction == directions.w)
+                    dir = 4;
 
-				switch (dir)
-				{
-				case 1: //север
-				{
-					if ((X_R & qq[i] & direction) != bddfalse)
-					{
-						str_plan.push("forward");
-						plan.push(Forward_next);
-					}
+                switch (dir)
+                {
+                case 1: //север
+                {
+                    if ((X_R & qq[i] & direction) != bddfalse)
+                    {
+                        str_plan.push("forward");
+                        plan.push(Forward_next);
+                    }
 
-					else if ((X_R & qq[i] & direction) == bddfalse)
-					{
-						if ((X_R & qq[i] & directions.e) != bddfalse)
-						{
-							str_plan.push("turnRight");
-							plan.push(TurnRight_next);
-							str_plan.push("forward");
-							plan.push(Forward_next);
-							//direction = e;
-						}
-						else if ((X_R & qq[i] & directions.w) != bddfalse)
-						{
-							str_plan.push("turnLeft");
-							plan.push(TurnLeft_next);
-							str_plan.push("forward");
-							plan.push(Forward_next);
-							//direction = w;
-						}
-						else if ((X_R & qq[i] & directions.s) != bddfalse)
-						{
-							str_plan.push("turnLeft");
-							plan.push(TurnLeft_next);
-							str_plan.push("turnLeft");
-							plan.push(TurnLeft_next);
-							str_plan.push("forward");
-							plan.push(Forward_next);
-							//direction = s;
-						}
-					}
-				} break;
-				case 2: //юг
-				{
-					if ((X_R & qq[i] & direction) != bddfalse)
-					{
-						str_plan.push("forward");
-						plan.push(Forward_next);
-					}
-					else if ((X_R & qq[i] & direction) == bddfalse)
-					{
-						if ((X_R & qq[i] & directions.e) != bddfalse)
-						{
-							str_plan.push("turnLeft");
-							plan.push(TurnLeft_next);
-							str_plan.push("forward");
-							plan.push(Forward_next);
-							//direction = e;
-						}
-						else if ((X_R & qq[i] & directions.w) != bddfalse)
-						{
-							str_plan.push("turnRight");
-							plan.push(TurnRight_next);
-							str_plan.push("forward");
-							plan.push(Forward_next);
-							//direction = w;
-						}
-						else if ((X_R & qq[i] & directions.n) != bddfalse)
-						{
-							str_plan.push("turnLeft");
-							plan.push(TurnLeft_next);
-							str_plan.push("turnLeft");
-							plan.push(TurnLeft_next);
-							str_plan.push("forward");
-							plan.push(Forward_next);
-							//direction = n;
-						}
-					}
-				} break;
-				case 3: //восток
-				{
-					if ((X_R & qq[i] & direction) != bddfalse)
-					{
-						str_plan.push("forward");
-						plan.push(Forward_next);
-					}
-					else if ((X_R & qq[i] & direction) == bddfalse)
-					{
-						if ((X_R & qq[i] & directions.s) != bddfalse)
-						{
-							str_plan.push("turnRight");
-							plan.push(TurnRight_next);
-							str_plan.push("forward");
-							plan.push(Forward_next);
-							//direction = s;
-						}
-						else if ((X_R & qq[i] & directions.n) != bddfalse)
-						{
-							str_plan.push("turnLeft");
-							plan.push(TurnLeft_next);
-							str_plan.push("forward");
-							plan.push(Forward_next);
-							//direction = n;
-						}
-						else if ((X_R & qq[i] & directions.w) != bddfalse)
-						{
-							str_plan.push("turnLeft");
-							plan.push(TurnLeft_next);
-							str_plan.push("turnLeft");
-							plan.push(TurnLeft_next);
-							str_plan.push("forward");
-							plan.push(Forward_next);
-							//direction = w;
-						}
-					}
-				} break;
-				case 4: //запад
-				{
-					if ((X_R & qq[i] & direction) != bddfalse)
-					{
-						str_plan.push("forward");
-						plan.push(Forward_next);
-					}
-					else if ((X_R & qq[i] & direction) == bddfalse)
-					{
-						if ((X_R & qq[i] & directions.s) != bddfalse)
-						{
-							str_plan.push("turnLeft");
-							plan.push(TurnLeft_next);
-							str_plan.push("forward");
-							plan.push(Forward_next);
-							//direction = s;
-						}
-						else if ((X_R & qq[i] & directions.n) != bddfalse)
-						{
-							str_plan.push("turnRight");
-							plan.push(TurnRight_next);
-							str_plan.push("forward");
-							plan.push(Forward_next);
-							//direction = n;
-						}
-						else if ((X_R & qq[i] & directions.e) != bddfalse)
-						{
-							str_plan.push("turnLeft");
-							plan.push(TurnLeft_next);
-							str_plan.push("turnLeft");
-							plan.push(TurnLeft_next);
-							str_plan.push("forward");
-							plan.push(Forward_next);
-							//direction = e;
-						}
-					}
-				}break;
-				}
-				//out.open("Route.txt", std::ios::app);
-				//for (int k = 0; k < answer.size(); k++)
-				//{
-				//	cout << answer[k];
-				//	out << answer[k];
-				//}
-				//out << endl;
-				//out.close();
-				//cout << endl;
-				//break;
-			}
+                    else if ((X_R & qq[i] & direction) == bddfalse)
+                    {
+                        if ((X_R & qq[i] & directions.e) != bddfalse)
+                        {
+                            str_plan.push("turnRight");
+                            plan.push(TurnRight_next);
+                            str_plan.push("forward");
+                            plan.push(Forward_next);
+                            //direction = e;
+                        }
+                        else if ((X_R & qq[i] & directions.w) != bddfalse)
+                        {
+                            str_plan.push("turnLeft");
+                            plan.push(TurnLeft_next);
+                            str_plan.push("forward");
+                            plan.push(Forward_next);
+                            //direction = w;
+                        }
+                        else if ((X_R & qq[i] & directions.s) != bddfalse)
+                        {
+                            str_plan.push("turnLeft");
+                            plan.push(TurnLeft_next);
+                            str_plan.push("turnLeft");
+                            plan.push(TurnLeft_next);
+                            str_plan.push("forward");
+                            plan.push(Forward_next);
+                            //direction = s;
+                        }
+                    }
+                } break;
+                case 2: //юг
+                {
+                    if ((X_R & qq[i] & direction) != bddfalse)
+                    {
+                        str_plan.push("forward");
+                        plan.push(Forward_next);
+                    }
+                    else if ((X_R & qq[i] & direction) == bddfalse)
+                    {
+                        if ((X_R & qq[i] & directions.e) != bddfalse)
+                        {
+                            str_plan.push("turnLeft");
+                            plan.push(TurnLeft_next);
+                            str_plan.push("forward");
+                            plan.push(Forward_next);
+                            //direction = e;
+                        }
+                        else if ((X_R & qq[i] & directions.w) != bddfalse)
+                        {
+                            str_plan.push("turnRight");
+                            plan.push(TurnRight_next);
+                            str_plan.push("forward");
+                            plan.push(Forward_next);
+                            //direction = w;
+                        }
+                        else if ((X_R & qq[i] & directions.n) != bddfalse)
+                        {
+                            str_plan.push("turnLeft");
+                            plan.push(TurnLeft_next);
+                            str_plan.push("turnLeft");
+                            plan.push(TurnLeft_next);
+                            str_plan.push("forward");
+                            plan.push(Forward_next);
+                            //direction = n;
+                        }
+                    }
+                } break;
+                case 3: //восток
+                {
+                    if ((X_R & qq[i] & direction) != bddfalse)
+                    {
+                        str_plan.push("forward");
+                        plan.push(Forward_next);
+                    }
+                    else if ((X_R & qq[i] & direction) == bddfalse)
+                    {
+                        if ((X_R & qq[i] & directions.s) != bddfalse)
+                        {
+                            str_plan.push("turnRight");
+                            plan.push(TurnRight_next);
+                            str_plan.push("forward");
+                            plan.push(Forward_next);
+                            //direction = s;
+                        }
+                        else if ((X_R & qq[i] & directions.n) != bddfalse)
+                        {
+                            str_plan.push("turnLeft");
+                            plan.push(TurnLeft_next);
+                            str_plan.push("forward");
+                            plan.push(Forward_next);
+                            //direction = n;
+                        }
+                        else if ((X_R & qq[i] & directions.w) != bddfalse)
+                        {
+                            str_plan.push("turnLeft");
+                            plan.push(TurnLeft_next);
+                            str_plan.push("turnLeft");
+                            plan.push(TurnLeft_next);
+                            str_plan.push("forward");
+                            plan.push(Forward_next);
+                            //direction = w;
+                        }
+                    }
+                } break;
+                case 4: //запад
+                {
+                    if ((X_R & qq[i] & direction) != bddfalse)
+                    {
+                        str_plan.push("forward");
+                        plan.push(Forward_next);
+                    }
+                    else if ((X_R & qq[i] & direction) == bddfalse)
+                    {
+                        if ((X_R & qq[i] & directions.s) != bddfalse)
+                        {
+                            str_plan.push("turnLeft");
+                            plan.push(TurnLeft_next);
+                            str_plan.push("forward");
+                            plan.push(Forward_next);
+                            //direction = s;
+                        }
+                        else if ((X_R & qq[i] & directions.n) != bddfalse)
+                        {
+                            str_plan.push("turnRight");
+                            plan.push(TurnRight_next);
+                            str_plan.push("forward");
+                            plan.push(Forward_next);
+                            //direction = n;
+                        }
+                        else if ((X_R & qq[i] & directions.e) != bddfalse)
+                        {
+                            str_plan.push("turnLeft");
+                            plan.push(TurnLeft_next);
+                            str_plan.push("turnLeft");
+                            plan.push(TurnLeft_next);
+                            str_plan.push("forward");
+                            plan.push(Forward_next);
+                            //direction = e;
+                        }
+                    }
+                }break;
+                }
+                //out.open("Route.txt", std::ios::app);
+                //for (int k = 0; k < answer.size(); k++)
+                //{
+                //  cout << answer[k];
+                //  out << answer[k];
+                //}
+                //out << endl;
+                //out.close();
+                //cout << endl;
+                //break;
+            }
             // иначе если ???
             // у нас в X_R уже включена first_state !
             else if ((X_R & qq[i] & first_state) != bddfalse)
-			{
-				int j = 0;
-				bool cflag = false;
-				while (j < visited.size() && !cflag)
-				{
-					if (qq[i] == visited[j])
-					{
-						cflag = true;
-					}
-					j++;
-				}
-				if (!cflag)
-				{
-					if (direction == directions.n)
-						dir = 1;
-					else if (direction == directions.s)
-						dir = 2;
-					else if (direction == directions.e)
-						dir = 3;
-					else if (direction == directions.w)
-						dir = 4;
-					switch (dir)
-					{
-					case 1: //север
-					{
-						if ((X_R & qq[i] & direction) != bddfalse)
-						{
-							str_plan.push("forward");
-							plan.push(Forward_next);
-						}
+            {
+                int j = 0;
+                bool cflag = false;
+                while (j < visited.size() && !cflag)
+                {
+                    if (qq[i] == visited[j])
+                    {
+                        cflag = true;
+                    }
+                    j++;
+                }
+                if (!cflag)
+                {
+                    if (direction == directions.n)
+                        dir = 1;
+                    else if (direction == directions.s)
+                        dir = 2;
+                    else if (direction == directions.e)
+                        dir = 3;
+                    else if (direction == directions.w)
+                        dir = 4;
+                    switch (dir)
+                    {
+                    case 1: //север
+                    {
+                        if ((X_R & qq[i] & direction) != bddfalse)
+                        {
+                            str_plan.push("forward");
+                            plan.push(Forward_next);
+                        }
 
-						else if ((X_R & qq[i] & direction) == bddfalse)
-						{
-							if ((X_R & qq[i] & directions.e) != bddfalse)
-							{
-								str_plan.push("turnRight");
-								plan.push(TurnRight_next);
-								str_plan.push("forward");
-								plan.push(Forward_next);
-								//direction = e;
-							}
-							else if ((X_R & qq[i] & directions.w) != bddfalse)
-							{
-								str_plan.push("turnLeft");
-								plan.push(TurnLeft_next);
-								str_plan.push("forward");
-								plan.push(Forward_next);
-								//direction = w;
-							}
-							else if ((X_R & qq[i] & directions.s) != bddfalse)
-							{
-								str_plan.push("turnLeft");
-								plan.push(TurnLeft_next);
-								str_plan.push("turnLeft");
-								plan.push(TurnLeft_next);
-								str_plan.push("forward");
-								plan.push(Forward_next);
-								//direction = s;
-							}
-						}
-					} break;
-					case 2: //юг
-					{
-						if ((X_R & qq[i] & direction) != bddfalse)
-						{
-							str_plan.push("forward");
-							plan.push(Forward_next);
-						}
-						else if ((X_R & qq[i] & direction) == bddfalse)
-						{
-							if ((X_R & qq[i] & directions.e) != bddfalse)
-							{
-								str_plan.push("turnLeft");
-								plan.push(TurnLeft_next);
-								str_plan.push("forward");
-								plan.push(Forward_next);
-								//direction = e;
-							}
-							else if ((X_R & qq[i] & directions.w) != bddfalse)
-							{
-								str_plan.push("turnRight");
-								plan.push(TurnRight_next);
-								str_plan.push("forward");
-								plan.push(Forward_next);
-								//direction = w;
-							}
-							else if ((X_R & qq[i] & directions.n) != bddfalse)
-							{
-								str_plan.push("turnLeft");
-								plan.push(TurnLeft_next);
-								str_plan.push("turnLeft");
-								plan.push(TurnLeft_next);
-								str_plan.push("forward");
-								plan.push(Forward_next);
-								//direction = n;
-							}
-						}
-					} break;
-					case 3: //восток
-					{
-						if ((X_R & qq[i] & direction) != bddfalse)
-						{
-							str_plan.push("forward");
-							plan.push(Forward_next);
-						}
-						else if ((X_R & qq[i] & direction) == bddfalse)
-						{
-							if ((X_R & qq[i] & directions.s) != bddfalse)
-							{
-								str_plan.push("turnRight");
-								plan.push(TurnRight_next);
-								str_plan.push("forward");
-								plan.push(Forward_next);
-								//direction = s;
-							}
-							else if ((X_R & qq[i] & directions.n) != bddfalse)
-							{
-								str_plan.push("turnLeft");
-								plan.push(TurnLeft_next);
-								str_plan.push("forward");
-								plan.push(Forward_next);
-								//direction = n;
-							}
-							else if ((X_R & qq[i] & directions.w) != bddfalse)
-							{
-								str_plan.push("turnLeft");
-								plan.push(TurnLeft_next);
-								str_plan.push("turnLeft");
-								plan.push(TurnLeft_next);
-								str_plan.push("forward");
-								plan.push(Forward_next);
-								//direction = w;
-							}
-						}
-					} break;
-					case 4: //запад
-					{
-						if ((X_R & qq[i] & direction) != bddfalse)
-						{
-							str_plan.push("forward");
-							plan.push(Forward_next);
-						}
-						else if ((X_R & qq[i] & direction) == bddfalse)
-						{
-							if ((X_R & qq[i] & directions.s) != bddfalse)
-							{
-								str_plan.push("turnLeft");
-								plan.push(TurnLeft_next);
-								str_plan.push("forward");
-								plan.push(Forward_next);
-								//direction = s;
-							}
-							else if ((X_R & qq[i] & directions.n) != bddfalse)
-							{
-								str_plan.push("turnRight");
-								plan.push(TurnRight_next);
-								str_plan.push("forward");
-								plan.push(Forward_next);
-								//direction = n;
-							}
-							else if ((X_R & qq[i] & directions.e) != bddfalse)
-							{
-								str_plan.push("turnLeft");
-								plan.push(TurnLeft_next);
-								str_plan.push("turnLeft");
-								plan.push(TurnLeft_next);
-								str_plan.push("forward");
-								plan.push(Forward_next);
-								//direction = e;
-							}
-						}
-					}break;
-					}
-					for (int j = 0; j < 9; j++)
-					{
-						if ((relation & q[i] & qq[j]) != bddfalse)
-						{
-							bool kflag = false;
-							int k = 0;
-							while (k < visited.size() && !kflag)
-							{
-								if (qq[j] == visited[k])
-								{
-									kflag = true;
-								}
-								k++;
-							}
-							if (!kflag)
-							{
-								visited.push_back(qq[i]);
-								answer.push_back(i);
-								find_path(plan, str_plan, relation, q[i], q, qq, wished_state, answer, visited, direction, actionsNext, directions);
-								break;
-							}
-						}
-					}
-				}
-			}
-		}
+                        else if ((X_R & qq[i] & direction) == bddfalse)
+                        {
+                            if ((X_R & qq[i] & directions.e) != bddfalse)
+                            {
+                                str_plan.push("turnRight");
+                                plan.push(TurnRight_next);
+                                str_plan.push("forward");
+                                plan.push(Forward_next);
+                                //direction = e;
+                            }
+                            else if ((X_R & qq[i] & directions.w) != bddfalse)
+                            {
+                                str_plan.push("turnLeft");
+                                plan.push(TurnLeft_next);
+                                str_plan.push("forward");
+                                plan.push(Forward_next);
+                                //direction = w;
+                            }
+                            else if ((X_R & qq[i] & directions.s) != bddfalse)
+                            {
+                                str_plan.push("turnLeft");
+                                plan.push(TurnLeft_next);
+                                str_plan.push("turnLeft");
+                                plan.push(TurnLeft_next);
+                                str_plan.push("forward");
+                                plan.push(Forward_next);
+                                //direction = s;
+                            }
+                        }
+                    } break;
+                    case 2: //юг
+                    {
+                        if ((X_R & qq[i] & direction) != bddfalse)
+                        {
+                            str_plan.push("forward");
+                            plan.push(Forward_next);
+                        }
+                        else if ((X_R & qq[i] & direction) == bddfalse)
+                        {
+                            if ((X_R & qq[i] & directions.e) != bddfalse)
+                            {
+                                str_plan.push("turnLeft");
+                                plan.push(TurnLeft_next);
+                                str_plan.push("forward");
+                                plan.push(Forward_next);
+                                //direction = e;
+                            }
+                            else if ((X_R & qq[i] & directions.w) != bddfalse)
+                            {
+                                str_plan.push("turnRight");
+                                plan.push(TurnRight_next);
+                                str_plan.push("forward");
+                                plan.push(Forward_next);
+                                //direction = w;
+                            }
+                            else if ((X_R & qq[i] & directions.n) != bddfalse)
+                            {
+                                str_plan.push("turnLeft");
+                                plan.push(TurnLeft_next);
+                                str_plan.push("turnLeft");
+                                plan.push(TurnLeft_next);
+                                str_plan.push("forward");
+                                plan.push(Forward_next);
+                                //direction = n;
+                            }
+                        }
+                    } break;
+                    case 3: //восток
+                    {
+                        if ((X_R & qq[i] & direction) != bddfalse)
+                        {
+                            str_plan.push("forward");
+                            plan.push(Forward_next);
+                        }
+                        else if ((X_R & qq[i] & direction) == bddfalse)
+                        {
+                            if ((X_R & qq[i] & directions.s) != bddfalse)
+                            {
+                                str_plan.push("turnRight");
+                                plan.push(TurnRight_next);
+                                str_plan.push("forward");
+                                plan.push(Forward_next);
+                                //direction = s;
+                            }
+                            else if ((X_R & qq[i] & directions.n) != bddfalse)
+                            {
+                                str_plan.push("turnLeft");
+                                plan.push(TurnLeft_next);
+                                str_plan.push("forward");
+                                plan.push(Forward_next);
+                                //direction = n;
+                            }
+                            else if ((X_R & qq[i] & directions.w) != bddfalse)
+                            {
+                                str_plan.push("turnLeft");
+                                plan.push(TurnLeft_next);
+                                str_plan.push("turnLeft");
+                                plan.push(TurnLeft_next);
+                                str_plan.push("forward");
+                                plan.push(Forward_next);
+                                //direction = w;
+                            }
+                        }
+                    } break;
+                    case 4: //запад
+                    {
+                        if ((X_R & qq[i] & direction) != bddfalse)
+                        {
+                            str_plan.push("forward");
+                            plan.push(Forward_next);
+                        }
+                        else if ((X_R & qq[i] & direction) == bddfalse)
+                        {
+                            if ((X_R & qq[i] & directions.s) != bddfalse)
+                            {
+                                str_plan.push("turnLeft");
+                                plan.push(TurnLeft_next);
+                                str_plan.push("forward");
+                                plan.push(Forward_next);
+                                //direction = s;
+                            }
+                            else if ((X_R & qq[i] & directions.n) != bddfalse)
+                            {
+                                str_plan.push("turnRight");
+                                plan.push(TurnRight_next);
+                                str_plan.push("forward");
+                                plan.push(Forward_next);
+                                //direction = n;
+                            }
+                            else if ((X_R & qq[i] & directions.e) != bddfalse)
+                            {
+                                str_plan.push("turnLeft");
+                                plan.push(TurnLeft_next);
+                                str_plan.push("turnLeft");
+                                plan.push(TurnLeft_next);
+                                str_plan.push("forward");
+                                plan.push(Forward_next);
+                                //direction = e;
+                            }
+                        }
+                    }break;
+                    }
+                    for (int j = 0; j < 9; j++)
+                    {
+                        if ((relation & q[i] & qq[j]) != bddfalse)
+                        {
+                            bool kflag = false;
+                            int k = 0;
+                            while (k < visited.size() && !kflag)
+                            {
+                                if (qq[j] == visited[k])
+                                {
+                                    kflag = true;
+                                }
+                                k++;
+                            }
+                            if (!kflag)
+                            {
+                                visited.push_back(qq[i]);
+                                answer.push_back(i);
+                                find_path(plan, str_plan, relation, q[i], q, qq, wished_state, answer, visited, direction, actionsNext, directions);
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+        }
 
-		if (X_pr == first_state)
-		{
-			flag = true;
-			to_stop_recursion = true;
+        if (X_pr == first_state)
+        {
+            flag = true;
+            to_stop_recursion = true;
         }
         else
         {
