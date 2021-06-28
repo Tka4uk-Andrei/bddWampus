@@ -1,4 +1,4 @@
-#pragma once
+п»ї#pragma once
 
 #pragma comment(lib,"bdd.lib")
 #pragma warning (disable : 26444)
@@ -16,80 +16,80 @@ using namespace std;
 typedef uint(*heuristicDist)(int, int, int);
 
 /// <summary>
-///     Название действия "движение вперёд"
+///     РќР°Р·РІР°РЅРёРµ РґРµР№СЃС‚РІРёСЏ "РґРІРёР¶РµРЅРёРµ РІРїРµСЂС‘Рґ"
 /// </summary>
 string FORWARD_STR    = "forward";
 
 /// <summary>
-///     Название действия "поворот налево"
+///     РќР°Р·РІР°РЅРёРµ РґРµР№СЃС‚РІРёСЏ "РїРѕРІРѕСЂРѕС‚ РЅР°Р»РµРІРѕ"
 /// </summary>
 string TURN_LEFT_STR  = "turnLeft";
 
 /// <summary>
-///     Название действия "поворот направо"
+///     РќР°Р·РІР°РЅРёРµ РґРµР№СЃС‚РІРёСЏ "РїРѕРІРѕСЂРѕС‚ РЅР°РїСЂР°РІРѕ"
 /// </summary>
 string TURN_RIGHT_STR = "turnRight";
 
 /// <summary>
-///     План действий для агента
+///     РџР»Р°РЅ РґРµР№СЃС‚РІРёР№ РґР»СЏ Р°РіРµРЅС‚Р°
 /// </summary>
 struct Plan
 {
     /// <summary>
-    ///     Описание последовательности дествий в формате BDD
+    ///     РћРїРёСЃР°РЅРёРµ РїРѕСЃР»РµРґРѕРІР°С‚РµР»СЊРЅРѕСЃС‚Рё РґРµСЃС‚РІРёР№ РІ С„РѕСЂРјР°С‚Рµ BDD
     /// </summary>
     vector<bdd> bddPlan;
 
     /// <summary>
-    ///     Описание последовательности действий в текстовом формате
+    ///     РћРїРёСЃР°РЅРёРµ РїРѕСЃР»РµРґРѕРІР°С‚РµР»СЊРЅРѕСЃС‚Рё РґРµР№СЃС‚РІРёР№ РІ С‚РµРєСЃС‚РѕРІРѕРј С„РѕСЂРјР°С‚Рµ
     /// </summary>
     vector<string> strPlan;
 };
 
 /// <summary>
-///     Определение соседей относительно клетки cell
+///     РћРїСЂРµРґРµР»РµРЅРёРµ СЃРѕСЃРµРґРµР№ РѕС‚РЅРѕСЃРёС‚РµР»СЊРЅРѕ РєР»РµС‚РєРё cell
 /// </summary>
-/// <param name="cell"> -- номер ячейки, относительно которой определяются соседи </param>
-/// <param name="nRow"> -- длина поля </param>
-/// <param name="nColumn"> -- ширина поля </param>
-/// <returns> Набор номеров соседних клеток </returns>
+/// <param name="cell"> -- РЅРѕРјРµСЂ СЏС‡РµР№РєРё, РѕС‚РЅРѕСЃРёС‚РµР»СЊРЅРѕ РєРѕС‚РѕСЂРѕР№ РѕРїСЂРµРґРµР»СЏСЋС‚СЃСЏ СЃРѕСЃРµРґРё </param>
+/// <param name="nRow"> -- РґР»РёРЅР° РїРѕР»СЏ </param>
+/// <param name="nColumn"> -- С€РёСЂРёРЅР° РїРѕР»СЏ </param>
+/// <returns> РќР°Р±РѕСЂ РЅРѕРјРµСЂРѕРІ СЃРѕСЃРµРґРЅРёС… РєР»РµС‚РѕРє </returns>
 vector<int> neighbourNodes(int cell, uint nRow, uint nColumn);
 
 /// <summary>
-///     Проверка того что две клетки соседи
+///     РџСЂРѕРІРµСЂРєР° С‚РѕРіРѕ С‡С‚Рѕ РґРІРµ РєР»РµС‚РєРё СЃРѕСЃРµРґРё
 /// </summary>
-/// <param name="cell"> -- номер ячейки, относительно которой идёт проверка потенциального соседа </param>
-/// <param name="probe"> -- номер ячейки, которую проверяют на соседство </param>
-/// <param name="nRow"> -- длина поля </param>
-/// <param name="nColumn"> -- ширина поля </param>
-/// <returns> истина, если соседи, иначе ложь </returns>
+/// <param name="cell"> -- РЅРѕРјРµСЂ СЏС‡РµР№РєРё, РѕС‚РЅРѕСЃРёС‚РµР»СЊРЅРѕ РєРѕС‚РѕСЂРѕР№ РёРґС‘С‚ РїСЂРѕРІРµСЂРєР° РїРѕС‚РµРЅС†РёР°Р»СЊРЅРѕРіРѕ СЃРѕСЃРµРґР° </param>
+/// <param name="probe"> -- РЅРѕРјРµСЂ СЏС‡РµР№РєРё, РєРѕС‚РѕСЂСѓСЋ РїСЂРѕРІРµСЂСЏСЋС‚ РЅР° СЃРѕСЃРµРґСЃС‚РІРѕ </param>
+/// <param name="nRow"> -- РґР»РёРЅР° РїРѕР»СЏ </param>
+/// <param name="nColumn"> -- С€РёСЂРёРЅР° РїРѕР»СЏ </param>
+/// <returns> РёСЃС‚РёРЅР°, РµСЃР»Рё СЃРѕСЃРµРґРё, РёРЅР°С‡Рµ Р»РѕР¶СЊ </returns>
 bool isNeighbour(int cell, int probe, uint nRow, uint nColumn);
 
 /// <summary>
-///     Получениие плана действий для перехода между соседними клетками
+///     РџРѕР»СѓС‡РµРЅРёРёРµ РїР»Р°РЅР° РґРµР№СЃС‚РІРёР№ РґР»СЏ РїРµСЂРµС…РѕРґР° РјРµР¶РґСѓ СЃРѕСЃРµРґРЅРёРјРё РєР»РµС‚РєР°РјРё
 /// </summary>
-/// <param name="plan"> -- План, в который добавляются действия </param>
-/// <param name="currentDir"> -- Текущее направление агента </param>
-/// <param name="destDir"> -- Направление, куда надо смотреть для перехода </param>
-/// <param name="directions"> -- Переменная, описывающая направления движения </param>
-/// <param name="actions"> -- Переменная, описывающая действия  агента </param>
+/// <param name="plan"> -- РџР»Р°РЅ, РІ РєРѕС‚РѕСЂС‹Р№ РґРѕР±Р°РІР»СЏСЋС‚СЃСЏ РґРµР№СЃС‚РІРёСЏ </param>
+/// <param name="currentDir"> -- РўРµРєСѓС‰РµРµ РЅР°РїСЂР°РІР»РµРЅРёРµ Р°РіРµРЅС‚Р° </param>
+/// <param name="destDir"> -- РќР°РїСЂР°РІР»РµРЅРёРµ, РєСѓРґР° РЅР°РґРѕ СЃРјРѕС‚СЂРµС‚СЊ РґР»СЏ РїРµСЂРµС…РѕРґР° </param>
+/// <param name="directions"> -- РџРµСЂРµРјРµРЅРЅР°СЏ, РѕРїРёСЃС‹РІР°СЋС‰Р°СЏ РЅР°РїСЂР°РІР»РµРЅРёСЏ РґРІРёР¶РµРЅРёСЏ </param>
+/// <param name="actions"> -- РџРµСЂРµРјРµРЅРЅР°СЏ, РѕРїРёСЃС‹РІР°СЋС‰Р°СЏ РґРµР№СЃС‚РІРёСЏ  Р°РіРµРЅС‚Р° </param>
 void getNeighbourPlan(Plan& plan, bdd& currentDir, bdd& destDir, Directions& directions, TimeDependentActions& actions);
 
 /// <summary>
-///     Получение номера направления
+///     РџРѕР»СѓС‡РµРЅРёРµ РЅРѕРјРµСЂР° РЅР°РїСЂР°РІР»РµРЅРёСЏ
 /// </summary>
-/// <param name="dir"> -- Направление, для которого нужно получить номер </param>
-/// <param name="directions"> -- Переменная, описывающая направления движения </param>
-/// <returns> 0 - север, 1 - запад, 2 - юг, 3 - восток </returns>
+/// <param name="dir"> -- РќР°РїСЂР°РІР»РµРЅРёРµ, РґР»СЏ РєРѕС‚РѕСЂРѕРіРѕ РЅСѓР¶РЅРѕ РїРѕР»СѓС‡РёС‚СЊ РЅРѕРјРµСЂ </param>
+/// <param name="directions"> -- РџРµСЂРµРјРµРЅРЅР°СЏ, РѕРїРёСЃС‹РІР°СЋС‰Р°СЏ РЅР°РїСЂР°РІР»РµРЅРёСЏ РґРІРёР¶РµРЅРёСЏ </param>
+/// <returns> 0 - СЃРµРІРµСЂ, 1 - Р·Р°РїР°Рґ, 2 - СЋРі, 3 - РІРѕСЃС‚РѕРє </returns>
 int getDirId(bdd& dir, Directions& directions);
 
 /// <summary>
-///     Эвристическая функция оценки стоимости достижения узла
+///     Р­РІСЂРёСЃС‚РёС‡РµСЃРєР°СЏ С„СѓРЅРєС†РёСЏ РѕС†РµРЅРєРё СЃС‚РѕРёРјРѕСЃС‚Рё РґРѕСЃС‚РёР¶РµРЅРёСЏ СѓР·Р»Р°
 /// </summary>
-/// <param name="cur"> -- Текущий номер узла </param>
-/// <param name="dest"> -- Номер конечного узла </param>
-/// <param name="nColumn"> -- ширина поля </param>
-/// <returns> числовое значение  </returns>
+/// <param name="cur"> -- РўРµРєСѓС‰РёР№ РЅРѕРјРµСЂ СѓР·Р»Р° </param>
+/// <param name="dest"> -- РќРѕРјРµСЂ РєРѕРЅРµС‡РЅРѕРіРѕ СѓР·Р»Р° </param>
+/// <param name="nColumn"> -- С€РёСЂРёРЅР° РїРѕР»СЏ </param>
+/// <returns> С‡РёСЃР»РѕРІРѕРµ Р·РЅР°С‡РµРЅРёРµ  </returns>
 uint hDist(int cur, int dest, int nColumn)
 {
     int width = abs(cur % nColumn - dest % nColumn);
@@ -112,19 +112,19 @@ uint hDist3(int cur, int dest, int nColumn)
 }
 
 /// <summary>
-///     Поиск пути между указанными узлами. Если пути нет, поведение не предсказуемо
+///     РџРѕРёСЃРє РїСѓС‚Рё РјРµР¶РґСѓ СѓРєР°Р·Р°РЅРЅС‹РјРё СѓР·Р»Р°РјРё. Р•СЃР»Рё РїСѓС‚Рё РЅРµС‚, РїРѕРІРµРґРµРЅРёРµ РЅРµ РїСЂРµРґСЃРєР°Р·СѓРµРјРѕ
 /// </summary>
-/// <param name="plan"> -- План действий для достижения конечного узла </param>
-/// <param name="startNodeNum"> -- Номер узела из которого строится маршрут </param>
+/// <param name="plan"> -- РџР»Р°РЅ РґРµР№СЃС‚РІРёР№ РґР»СЏ РґРѕСЃС‚РёР¶РµРЅРёСЏ РєРѕРЅРµС‡РЅРѕРіРѕ СѓР·Р»Р° </param>
+/// <param name="startNodeNum"> -- РќРѕРјРµСЂ СѓР·РµР»Р° РёР· РєРѕС‚РѕСЂРѕРіРѕ СЃС‚СЂРѕРёС‚СЃСЏ РјР°СЂС€СЂСѓС‚ </param>
 /// <param name="relation"> --  </param>
-/// <param name="endNodeNum"> -- Номер узела назначения </param>
-/// <param name="safeCells"> -- Массив, содержащий информацию о безопасных ячейках </param>
-/// <param name="q"> -- Массив узлов закодированных в BDD для текущего момента времени </param>
-/// <param name="qq"> -- Массив узлов закодированных в BDD для следующего момента времени </param>
-/// <param name="nRow"> -- Длина поля </param>
-/// <param name="nColumn"> -- Ширина поля </param>
-/// <param name="fValues"> -- Массив с преподсчитанными значениями функции оценки </param>
-/// <param name="iniDir"> -- начальное направление агента </param>
+/// <param name="endNodeNum"> -- РќРѕРјРµСЂ СѓР·РµР»Р° РЅР°Р·РЅР°С‡РµРЅРёСЏ </param>
+/// <param name="safeCells"> -- РњР°СЃСЃРёРІ, СЃРѕРґРµСЂР¶Р°С‰РёР№ РёРЅС„РѕСЂРјР°С†РёСЋ Рѕ Р±РµР·РѕРїР°СЃРЅС‹С… СЏС‡РµР№РєР°С… </param>
+/// <param name="q"> -- РњР°СЃСЃРёРІ СѓР·Р»РѕРІ Р·Р°РєРѕРґРёСЂРѕРІР°РЅРЅС‹С… РІ BDD РґР»СЏ С‚РµРєСѓС‰РµРіРѕ РјРѕРјРµРЅС‚Р° РІСЂРµРјРµРЅРё </param>
+/// <param name="qq"> -- РњР°СЃСЃРёРІ СѓР·Р»РѕРІ Р·Р°РєРѕРґРёСЂРѕРІР°РЅРЅС‹С… РІ BDD РґР»СЏ СЃР»РµРґСѓСЋС‰РµРіРѕ РјРѕРјРµРЅС‚Р° РІСЂРµРјРµРЅРё </param>
+/// <param name="nRow"> -- Р”Р»РёРЅР° РїРѕР»СЏ </param>
+/// <param name="nColumn"> -- РЁРёСЂРёРЅР° РїРѕР»СЏ </param>
+/// <param name="fValues"> -- РњР°СЃСЃРёРІ СЃ РїСЂРµРїРѕРґСЃС‡РёС‚Р°РЅРЅС‹РјРё Р·РЅР°С‡РµРЅРёСЏРјРё С„СѓРЅРєС†РёРё РѕС†РµРЅРєРё </param>
+/// <param name="iniDir"> -- РЅР°С‡Р°Р»СЊРЅРѕРµ РЅР°РїСЂР°РІР»РµРЅРёРµ Р°РіРµРЅС‚Р° </param>
 void findPathAstar(Plan& plan, int startNodeNum, bdd& relation, int endNodeNum, vector<bool>& safeCells, vector<bdd>& q, vector<bdd>& qq, uint nRow, uint nColumn, vector<bdd>& fValues, bdd& iniDir, Directions& directions, TimeDependentActions& actions, heuristicDist hFun);
 
 
@@ -138,7 +138,7 @@ void findPathAstar(Plan& plan, int startNodeNum, bdd& relation, int endNodeNum, 
         visited[i] = false;
     }
 
-    // формируем отношения переходов на основании информации о безопасных клетках
+    // С„РѕСЂРјРёСЂСѓРµРј РѕС‚РЅРѕС€РµРЅРёСЏ РїРµСЂРµС…РѕРґРѕРІ РЅР° РѕСЃРЅРѕРІР°РЅРёРё РёРЅС„РѕСЂРјР°С†РёРё Рѕ Р±РµР·РѕРїР°СЃРЅС‹С… РєР»РµС‚РєР°С…
     bdd relations = bddfalse;
     for (int node = 0; node < nodeCount; ++node)
     {
@@ -155,22 +155,22 @@ void findPathAstar(Plan& plan, int startNodeNum, bdd& relation, int endNodeNum, 
         }
     }
 
-    // основная работа алгоритма поиска
+    // РѕСЃРЅРѕРІРЅР°СЏ СЂР°Р±РѕС‚Р° Р°Р»РіРѕСЂРёС‚РјР° РїРѕРёСЃРєР°
 
-    // инициализируем очередь
+    // РёРЅРёС†РёР°Р»РёР·РёСЂСѓРµРј РѕС‡РµСЂРµРґСЊ
     bdd queue = bddfalse;
     queue |= fValues[hDist(startNodeNum, endNodeNum, nColumn)] & q[startNodeNum];
     while ((queue & q[endNodeNum]) == bddfalse && queue != bddfalse)
     {
-        // извлекаем узел с минимальным значением
-        // TODO сделать через обход по дереву
-        // сначала находим число
+        // РёР·РІР»РµРєР°РµРј СѓР·РµР» СЃ РјРёРЅРёРјР°Р»СЊРЅС‹Рј Р·РЅР°С‡РµРЅРёРµРј
+        // TODO СЃРґРµР»Р°С‚СЊ С‡РµСЂРµР· РѕР±С…РѕРґ РїРѕ РґРµСЂРµРІСѓ
+        // СЃРЅР°С‡Р°Р»Р° РЅР°С…РѕРґРёРј С‡РёСЃР»Рѕ
         int fVal = 0;
         while ((queue & fValues[fVal]) == bddfalse)
         {
             ++fVal;
         }
-        // затем находим номер узла 
+        // Р·Р°С‚РµРј РЅР°С…РѕРґРёРј РЅРѕРјРµСЂ СѓР·Р»Р° 
         bdd nodesForOpening = queue & fValues[fVal];
         int node = 0;
         while ((nodesForOpening & q[node]) == bddfalse)
@@ -178,13 +178,13 @@ void findPathAstar(Plan& plan, int startNodeNum, bdd& relation, int endNodeNum, 
             ++node;
         }
 
-        // удаляем информацию об узле из очереди
+        // СѓРґР°Р»СЏРµРј РёРЅС„РѕСЂРјР°С†РёСЋ РѕР± СѓР·Р»Рµ РёР· РѕС‡РµСЂРµРґРё
         queue &= !(fValues[fVal] & q[node]);
 
-        // находим соседей
+        // РЅР°С…РѕРґРёРј СЃРѕСЃРµРґРµР№
         bdd neighbours = relations & q[node];
 
-        // вычисляем значения функции оценки для каждого соседа и заносим величины в очередь
+        // РІС‹С‡РёСЃР»СЏРµРј Р·РЅР°С‡РµРЅРёСЏ С„СѓРЅРєС†РёРё РѕС†РµРЅРєРё РґР»СЏ РєР°Р¶РґРѕРіРѕ СЃРѕСЃРµРґР° Рё Р·Р°РЅРѕСЃРёРј РІРµР»РёС‡РёРЅС‹ РІ РѕС‡РµСЂРµРґСЊ
         auto neighbNodes = neighbourNodes(node, nRow, nColumn);
         for (int nextNode : neighbNodes)
         {
@@ -194,7 +194,7 @@ void findPathAstar(Plan& plan, int startNodeNum, bdd& relation, int endNodeNum, 
                 {
                     int newFval = fVal - hFun(node, endNodeNum, nColumn) + 1 + hFun(nextNode, endNodeNum, nColumn);
 
-                    // проверка на то, что соседний узел не был добавлен в очередь
+                    // РїСЂРѕРІРµСЂРєР° РЅР° С‚Рѕ, С‡С‚Рѕ СЃРѕСЃРµРґРЅРёР№ СѓР·РµР» РЅРµ Р±С‹Р» РґРѕР±Р°РІР»РµРЅ РІ РѕС‡РµСЂРµРґСЊ
                     if ((queue & q[nextNode]) != bddfalse)
                     {
                         bdd temp = queue & q[nextNode];
@@ -204,7 +204,7 @@ void findPathAstar(Plan& plan, int startNodeNum, bdd& relation, int endNodeNum, 
                             ++fValNext;
                         }
 
-                        // удаляем старый элемент из очереди и добавляем новое значение
+                        // СѓРґР°Р»СЏРµРј СЃС‚Р°СЂС‹Р№ СЌР»РµРјРµРЅС‚ РёР· РѕС‡РµСЂРµРґРё Рё РґРѕР±Р°РІР»СЏРµРј РЅРѕРІРѕРµ Р·РЅР°С‡РµРЅРёРµ
                         queue &= !(fValues[fValNext] & q[nextNode]);
                         queue |= (fValues[min(fValNext, newFval)] & q[nextNode]);
                     }
@@ -216,20 +216,20 @@ void findPathAstar(Plan& plan, int startNodeNum, bdd& relation, int endNodeNum, 
             }
         }
 
-        // помечаем, что узел посещён
+        // РїРѕРјРµС‡Р°РµРј, С‡С‚Рѕ СѓР·РµР» РїРѕСЃРµС‰С‘РЅ
         visited[node] = true;
 
-        // заносим в стек раскрытых вершин
+        // Р·Р°РЅРѕСЃРёРј РІ СЃС‚РµРє СЂР°СЃРєСЂС‹С‚С‹С… РІРµСЂС€РёРЅ
         keyNodes.push(pair<int, int>(node, fVal - hFun(node, endNodeNum, nColumn)));
     }
 
-    // Если пути до узла назначения не существует
+    // Р•СЃР»Рё РїСѓС‚Рё РґРѕ СѓР·Р»Р° РЅР°Р·РЅР°С‡РµРЅРёСЏ РЅРµ СЃСѓС‰РµСЃС‚РІСѓРµС‚
     if (queue == bddfalse)
     {
         return;
     }
 
-    // получаем итоговое значение
+    // РїРѕР»СѓС‡Р°РµРј РёС‚РѕРіРѕРІРѕРµ Р·РЅР°С‡РµРЅРёРµ
     bdd endInfo = queue & q[endNodeNum];
     int gVal = 0;
     while ((queue & fValues[gVal]) == bddfalse)
@@ -237,12 +237,12 @@ void findPathAstar(Plan& plan, int startNodeNum, bdd& relation, int endNodeNum, 
         ++gVal;
     }
 
-    // формирование порядка
+    // С„РѕСЂРјРёСЂРѕРІР°РЅРёРµ РїРѕСЂСЏРґРєР°
     stack<int> nodePlan;
     nodePlan.push(endNodeNum);
     while (!keyNodes.empty())
     {
-        // проверяем что узел входит в итоговый маршрут
+        // РїСЂРѕРІРµСЂСЏРµРј С‡С‚Рѕ СѓР·РµР» РІС…РѕРґРёС‚ РІ РёС‚РѕРіРѕРІС‹Р№ РјР°СЂС€СЂСѓС‚
         if (gVal - 1  == keyNodes.top().second && isNeighbour(nodePlan.top(), keyNodes.top().first, nRow, nColumn))
         {
             --gVal;
@@ -252,7 +252,7 @@ void findPathAstar(Plan& plan, int startNodeNum, bdd& relation, int endNodeNum, 
         keyNodes.pop();
     }
 
-    // Формирование плана
+    // Р¤РѕСЂРјРёСЂРѕРІР°РЅРёРµ РїР»Р°РЅР°
     // TODO move to previous cycle
     bdd curDir = iniDir;
     while (nodePlan.size() != 1)
@@ -315,7 +315,7 @@ void getNeighbourPlan(Plan& plan, bdd& currentDir, bdd& destDir, Directions& dir
 
     int leftTurnCount = (destDirId - currentDirId + DIR_COUNT) % DIR_COUNT;
 
-    // Если повороты совершать не надо
+    // Р•СЃР»Рё РїРѕРІРѕСЂРѕС‚С‹ СЃРѕРІРµСЂС€Р°С‚СЊ РЅРµ РЅР°РґРѕ
     if (leftTurnCount == 0)
     {
         plan.bddPlan.push_back(actions.Forward);
@@ -323,7 +323,7 @@ void getNeighbourPlan(Plan& plan, bdd& currentDir, bdd& destDir, Directions& dir
         return;
     }
 
-    // Проверяем оптимально ли совершать левые повороты
+    // РџСЂРѕРІРµСЂСЏРµРј РѕРїС‚РёРјР°Р»СЊРЅРѕ Р»Рё СЃРѕРІРµСЂС€Р°С‚СЊ Р»РµРІС‹Рµ РїРѕРІРѕСЂРѕС‚С‹
     if (leftTurnCount <= HALF_TURN_ROUND)
     {
         for (int i = 0; i < leftTurnCount; ++i)
@@ -332,7 +332,7 @@ void getNeighbourPlan(Plan& plan, bdd& currentDir, bdd& destDir, Directions& dir
             plan.strPlan.push_back(TURN_LEFT_STR);
         }
     }
-    // Иначе совершаем правые повороты
+    // РРЅР°С‡Рµ СЃРѕРІРµСЂС€Р°РµРј РїСЂР°РІС‹Рµ РїРѕРІРѕСЂРѕС‚С‹
     else
     {
         for (int i = 0; i < DIR_COUNT - leftTurnCount; ++i)
@@ -350,22 +350,22 @@ vector<int> neighbourNodes(int cell, uint nRow, uint nColumn)
 {
     vector <int> neighbours;
 
-    // если ячейка не в крайнем левом столбце
+    // РµСЃР»Рё СЏС‡РµР№РєР° РЅРµ РІ РєСЂР°Р№РЅРµРј Р»РµРІРѕРј СЃС‚РѕР»Р±С†Рµ
     if (cell % nColumn != 0)
     {
         neighbours.push_back(cell - 1);
     }
-    // если ячейка не в крайнем правом столбце
+    // РµСЃР»Рё СЏС‡РµР№РєР° РЅРµ РІ РєСЂР°Р№РЅРµРј РїСЂР°РІРѕРј СЃС‚РѕР»Р±С†Рµ
     if ((cell + 1) % nColumn != 0)
     {
         neighbours.push_back(cell + 1);
     }
-    // если ячейка не на самой нижней строке
+    // РµСЃР»Рё СЏС‡РµР№РєР° РЅРµ РЅР° СЃР°РјРѕР№ РЅРёР¶РЅРµР№ СЃС‚СЂРѕРєРµ
     if (cell < nColumn * (nRow - 1))
     {
         neighbours.push_back(cell + nColumn);
     }
-    // если ячейка не на самой верхней строке
+    // РµСЃР»Рё СЏС‡РµР№РєР° РЅРµ РЅР° СЃР°РјРѕР№ РІРµСЂС…РЅРµР№ СЃС‚СЂРѕРєРµ
     if (cell >= nColumn)
     {
         neighbours.push_back(cell - nColumn);
@@ -376,28 +376,28 @@ vector<int> neighbourNodes(int cell, uint nRow, uint nColumn)
 
 bool isNeighbour(int cell, int probe, uint nRow, uint nColumn)
 {
-    // если ячейка не в крайнем левом столбце и она сосед слева
+    // РµСЃР»Рё СЏС‡РµР№РєР° РЅРµ РІ РєСЂР°Р№РЅРµРј Р»РµРІРѕРј СЃС‚РѕР»Р±С†Рµ Рё РѕРЅР° СЃРѕСЃРµРґ СЃР»РµРІР°
     if (cell % nColumn != 0 && cell - 1 == probe)
     {
         return true;
     }
-    // если ячейка не в крайнем правом столбце и она сосед справа
+    // РµСЃР»Рё СЏС‡РµР№РєР° РЅРµ РІ РєСЂР°Р№РЅРµРј РїСЂР°РІРѕРј СЃС‚РѕР»Р±С†Рµ Рё РѕРЅР° СЃРѕСЃРµРґ СЃРїСЂР°РІР°
     if ((cell + 1) % nColumn != 0 && cell + 1 == probe)
     {
         return true;
     }
-    // если ячейка не на самой нижней строке и она сосед снизу
+    // РµСЃР»Рё СЏС‡РµР№РєР° РЅРµ РЅР° СЃР°РјРѕР№ РЅРёР¶РЅРµР№ СЃС‚СЂРѕРєРµ Рё РѕРЅР° СЃРѕСЃРµРґ СЃРЅРёР·Сѓ
     if (cell < nColumn * (nRow - 1) && cell + nColumn == probe)
     {
         return true;
     }
-    // если ячейка не на самой верхней строке и она сосед сверху
+    // РµСЃР»Рё СЏС‡РµР№РєР° РЅРµ РЅР° СЃР°РјРѕР№ РІРµСЂС…РЅРµР№ СЃС‚СЂРѕРєРµ Рё РѕРЅР° СЃРѕСЃРµРґ СЃРІРµСЂС…Сѓ
     if (cell >= nColumn && cell - nColumn == probe)
     {
         return true;
     }
 
-    // если ячейка не соседняя
+    // РµСЃР»Рё СЏС‡РµР№РєР° РЅРµ СЃРѕСЃРµРґРЅСЏСЏ
     return false;
 }
 

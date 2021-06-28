@@ -1,4 +1,4 @@
-#include <iostream>
+п»ї#include <iostream>
 #include <fstream>
 #include <sstream>
 #include <ctime>
@@ -11,13 +11,13 @@ typedef unsigned int uint;
 using namespace std;
 
 /// <summary>
-///     Проверка на наличие свойства в узле
+///     РџСЂРѕРІРµСЂРєР° РЅР° РЅР°Р»РёС‡РёРµ СЃРІРѕР№СЃС‚РІР° РІ СѓР·Р»Рµ
 /// </summary>
-/// <param name="map"> -- карта </param>
-/// <param name="cell"> -- номер ячейки для проверки </param>
-/// <param name="attribute"> -- название признака для проверки </param>
+/// <param name="map"> -- РєР°СЂС‚Р° </param>
+/// <param name="cell"> -- РЅРѕРјРµСЂ СЏС‡РµР№РєРё РґР»СЏ РїСЂРѕРІРµСЂРєРё </param>
+/// <param name="attribute"> -- РЅР°Р·РІР°РЅРёРµ РїСЂРёР·РЅР°РєР° РґР»СЏ РїСЂРѕРІРµСЂРєРё </param>
 /// <returns>
-///     true  -- если признак уже есть; || false -- признак отсутствует
+///     true  -- РµСЃР»Рё РїСЂРёР·РЅР°Рє СѓР¶Рµ РµСЃС‚СЊ; || false -- РїСЂРёР·РЅР°Рє РѕС‚СЃСѓС‚СЃС‚РІСѓРµС‚
 /// </returns>
 bool isAttributeExist(vector<vector<Node>>& map, int cell, Node attribute)
 {
@@ -33,14 +33,14 @@ bool isAttributeExist(vector<vector<Node>>& map, int cell, Node attribute)
 }
 
 /// <summary>
-///     Добавление информации о текущем узле и его соседях
+///     Р”РѕР±Р°РІР»РµРЅРёРµ РёРЅС„РѕСЂРјР°С†РёРё Рѕ С‚РµРєСѓС‰РµРј СѓР·Р»Рµ Рё РµРіРѕ СЃРѕСЃРµРґСЏС…
 /// </summary>
-/// <param name="map"> -- Карта, куда добавляется информация </param>
-/// <param name="cell"> -- Номер ячейки, относительно которой добавляется информация </param>
-/// <param name="central"> -- Информация об опорной клетке </param>
-/// <param name="child"> -- Информация о соседних клетках </param>
-/// <param name="nRows"> -- Длина поля </param>
-/// <param name="nColums"> -- Ширина поля </param>
+/// <param name="map"> -- РљР°СЂС‚Р°, РєСѓРґР° РґРѕР±Р°РІР»СЏРµС‚СЃСЏ РёРЅС„РѕСЂРјР°С†РёСЏ </param>
+/// <param name="cell"> -- РќРѕРјРµСЂ СЏС‡РµР№РєРё, РѕС‚РЅРѕСЃРёС‚РµР»СЊРЅРѕ РєРѕС‚РѕСЂРѕР№ РґРѕР±Р°РІР»СЏРµС‚СЃСЏ РёРЅС„РѕСЂРјР°С†РёСЏ </param>
+/// <param name="central"> -- РРЅС„РѕСЂРјР°С†РёСЏ РѕР± РѕРїРѕСЂРЅРѕР№ РєР»РµС‚РєРµ </param>
+/// <param name="child"> -- РРЅС„РѕСЂРјР°С†РёСЏ Рѕ СЃРѕСЃРµРґРЅРёС… РєР»РµС‚РєР°С… </param>
+/// <param name="nRows"> -- Р”Р»РёРЅР° РїРѕР»СЏ </param>
+/// <param name="nColums"> -- РЁРёСЂРёРЅР° РїРѕР»СЏ </param>
 void addNodeToMap(vector<vector<Node>> &map, int cell, Node central, Node child, int nRows, int nColums)
 {
     map[cell].push_back(central);
@@ -49,22 +49,22 @@ void addNodeToMap(vector<vector<Node>> &map, int cell, Node central, Node child,
 
     if (child != Node::NONE)
     {
-        // если ячейка не в крайнем левом столбце
+        // РµСЃР»Рё СЏС‡РµР№РєР° РЅРµ РІ РєСЂР°Р№РЅРµРј Р»РµРІРѕРј СЃС‚РѕР»Р±С†Рµ
         if (cell % nColums != 0)
         {
             neighbours.push_back(cell - 1);
         }
-        // если ячейка не в крайнем правом столбце
+        // РµСЃР»Рё СЏС‡РµР№РєР° РЅРµ РІ РєСЂР°Р№РЅРµРј РїСЂР°РІРѕРј СЃС‚РѕР»Р±С†Рµ
         if ((cell + 1) % nColums != 0)
         {
             neighbours.push_back(cell + 1);
         }
-        // если ячейка не на самой нижней строке
+        // РµСЃР»Рё СЏС‡РµР№РєР° РЅРµ РЅР° СЃР°РјРѕР№ РЅРёР¶РЅРµР№ СЃС‚СЂРѕРєРµ
         if (cell < nColums * (nRows - 1))
         {
             neighbours.push_back(cell + nColums);
         }
-        // если ячейка не на самой верхней строке
+        // РµСЃР»Рё СЏС‡РµР№РєР° РЅРµ РЅР° СЃР°РјРѕР№ РІРµСЂС…РЅРµР№ СЃС‚СЂРѕРєРµ
         if (cell >= nColums)
         {
             neighbours.push_back(cell - nColums);
@@ -86,11 +86,11 @@ int main()
 
     while (!programEnd)
     {
-        int nRows;     // Длина поля
-        int nColums;   // Ширина поля
-        int n;         // Количество узлов
-        int pitAmount; // Количество ям в поле
-        int mapAmount; // Количество генерируемых карт
+        int nRows;     // Р”Р»РёРЅР° РїРѕР»СЏ
+        int nColums;   // РЁРёСЂРёРЅР° РїРѕР»СЏ
+        int n;         // РљРѕР»РёС‡РµСЃС‚РІРѕ СѓР·Р»РѕРІ
+        int pitAmount; // РљРѕР»РёС‡РµСЃС‚РІРѕ СЏРј РІ РїРѕР»Рµ
+        int mapAmount; // РљРѕР»РёС‡РµСЃС‚РІРѕ РіРµРЅРµСЂРёСЂСѓРµРјС‹С… РєР°СЂС‚
 
         cout << "Enter field size: colums and rows (or width and height)" << endl;
         cin >> nRows >> nColums;
@@ -106,23 +106,23 @@ int main()
         int startI;
         cin >> startI;
 
-        // TODO добавить проверки полей на возможность создания
-        // Количество узлов не превышает RAND_MAX, количество ям меньше количества узлов на 3
+        // TODO РґРѕР±Р°РІРёС‚СЊ РїСЂРѕРІРµСЂРєРё РїРѕР»РµР№ РЅР° РІРѕР·РјРѕР¶РЅРѕСЃС‚СЊ СЃРѕР·РґР°РЅРёСЏ
+        // РљРѕР»РёС‡РµСЃС‚РІРѕ СѓР·Р»РѕРІ РЅРµ РїСЂРµРІС‹С€Р°РµС‚ RAND_MAX, РєРѕР»РёС‡РµСЃС‚РІРѕ СЏРј РјРµРЅСЊС€Рµ РєРѕР»РёС‡РµСЃС‚РІР° СѓР·Р»РѕРІ РЅР° 3
 
         srand(time(0));
         for (int i = startI; i < mapAmount + startI; ++i)
         {
             cout << "Generating map " << setw(4) << i + 1 << " of " << setw(4) << mapAmount << "\r";
 
-            vector<int> occupiedNodes; // узлы которые могут быть заняты ямами и золотом и вампусом. Золото и вампус это последние два значения массива
+            vector<int> occupiedNodes; // СѓР·Р»С‹ РєРѕС‚РѕСЂС‹Рµ РјРѕРіСѓС‚ Р±С‹С‚СЊ Р·Р°РЅСЏС‚С‹ СЏРјР°РјРё Рё Р·РѕР»РѕС‚РѕРј Рё РІР°РјРїСѓСЃРѕРј. Р—РѕР»РѕС‚Рѕ Рё РІР°РјРїСѓСЃ СЌС‚Рѕ РїРѕСЃР»РµРґРЅРёРµ РґРІР° Р·РЅР°С‡РµРЅРёСЏ РјР°СЃСЃРёРІР°
 
-            // формируем узлы, которые будут помечены как ямы, золото и вампус
-            int generatedCount = 0; // количество сгенерированных функцией rand() занятых узлов
-            while (generatedCount != pitAmount + 2) // добавляем 2 т.к. надо учесть клетку с золотом, вампусом
+            // С„РѕСЂРјРёСЂСѓРµРј СѓР·Р»С‹, РєРѕС‚РѕСЂС‹Рµ Р±СѓРґСѓС‚ РїРѕРјРµС‡РµРЅС‹ РєР°Рє СЏРјС‹, Р·РѕР»РѕС‚Рѕ Рё РІР°РјРїСѓСЃ
+            int generatedCount = 0; // РєРѕР»РёС‡РµСЃС‚РІРѕ СЃРіРµРЅРµСЂРёСЂРѕРІР°РЅРЅС‹С… С„СѓРЅРєС†РёРµР№ rand() Р·Р°РЅСЏС‚С‹С… СѓР·Р»РѕРІ
+            while (generatedCount != pitAmount + 2) // РґРѕР±Р°РІР»СЏРµРј 2 С‚.Рє. РЅР°РґРѕ СѓС‡РµСЃС‚СЊ РєР»РµС‚РєСѓ СЃ Р·РѕР»РѕС‚РѕРј, РІР°РјРїСѓСЃРѕРј
             {
                 int newPitNode = 1 + rand() % (n - 1);
 
-                // проверяем что узел уже не был добавлен
+                // РїСЂРѕРІРµСЂСЏРµРј С‡С‚Рѕ СѓР·РµР» СѓР¶Рµ РЅРµ Р±С‹Р» РґРѕР±Р°РІР»РµРЅ
                 bool isInList = false;
                 for (int node : occupiedNodes)
                 {
@@ -139,8 +139,8 @@ int main()
                 }
             }
 
-            // Формируем карту
-            vector<vector<Node>>  map(n);  // создаём пустую карту
+            // Р¤РѕСЂРјРёСЂСѓРµРј РєР°СЂС‚Сѓ
+            vector<vector<Node>>  map(n);  // СЃРѕР·РґР°С‘Рј РїСѓСЃС‚СѓСЋ РєР°СЂС‚Сѓ
             map[0].push_back(Node::AGENT);
             for (int j = 0; j < pitAmount; ++j)
             {
@@ -156,7 +156,7 @@ int main()
                 }
             }
 
-            // печатаем результат в файл
+            // РїРµС‡Р°С‚Р°РµРј СЂРµР·СѓР»СЊС‚Р°С‚ РІ С„Р°Р№Р»
             ofstream out;
             stringstream fileName;
             fileName << nRows << "x" << nColums << "p" << pitAmount << "/map_" << i << ".txt";
