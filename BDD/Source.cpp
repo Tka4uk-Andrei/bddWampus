@@ -109,8 +109,7 @@ int move(int cell, string action, bdd& direction, Directions& dir);
 /// <param name="out"> -- Поток для вывода логов </param>
 /// <param name="isFullRun"> -- Флаг показывающий, полный запуск агента или только проверка алгоритма поиска пути </param>
 /// <returns> Время работы в микросекундах </returns>
-lint runAgent(string filePath, bool isAstarUse, ostream& out, bool isFullRun);
-
+lint runAgent(string filePath, bool isAstarUse, ostream& out, bool isFullRun, heuristicDist hFun);
 
 //переменные восприятия среды
 bdd Stench; // ощущение агентом 
@@ -210,8 +209,8 @@ int main()
     bool fullRun = true;
 
     constexpr uint TEST_COUNT = 20;
-    string TEST_FOLDER = "../WampusWorldGenerator/";
-    string testResFolder = "testResults/";
+    const string TEST_FOLDER = "../WampusWorldGenerator/";
+    const string TEST_RESULTS_FOLDER = "testResults/";
 
     // количество карт для каждой папки
     vector<uint> mapCounts = { /*10, 10, 10, 10, 10,*/
@@ -232,20 +231,33 @@ int main()
 
     for (int k = 0; k < mapFolders.size(); ++k )
     {
-        ofstream oldRes;
-        oldRes.open(testResFolder + "old_" + mapFolders[k] + ".txt");
+        //ofstream oldRes;
+        //oldRes.open(testResFolder + "old_" + mapFolders[k] + ".txt");
 
-        ofstream newRes;
-        newRes.open(testResFolder + "new_" + mapFolders[k] + ".txt");
+        ofstream new1Res;
+        new1Res.open(TEST_RESULTS_FOLDER + "new1_" + mapFolders[k] + ".txt");
+
+        ofstream new2Res;
+        new2Res.open(TEST_RESULTS_FOLDER + "new2_" + mapFolders[k] + ".txt");
+
+        ofstream new3Res;
+        new3Res.open(TEST_RESULTS_FOLDER + "new3_" + mapFolders[k] + ".txt");
+
+        ofstream cmpRes;
+        cmpRes.open(TEST_RESULTS_FOLDER + "cmp_" + mapFolders[k] + ".txt");
 
         lint oldAlgoTimeSum = 0;
-        lint newAlgoTimeSum = 0;
+        lint new1AlgoTimeSum = 0;
+        lint new2AlgoTimeSum = 0;
+        lint new3AlgoTimeSum = 0;
 
         // Цикл по картам одного типа
         for (uint i = 0; i < mapCounts[k]; ++i)
         {
             lint oldAlgoTimeSubSum = 0;
-            lint newAlgoTimeSubSum = 0;
+            lint new1AlgoTimeSubSum = 0;
+            lint new2AlgoTimeSubSum = 0;
+            lint new3AlgoTimeSubSum = 0;
 
             // Запускаем насколько раз программу на одном и том же наборе данных
             for (uint j = 0; j < TEST_COUNT; ++j)
@@ -258,31 +270,54 @@ int main()
                 ofstream logFile;
                 string logFileName = "log.txt";
 
-                logFile.open(testResFolder + logFileName, ios_base::app);
-                logFile << "<< Run old agent for map " << mapFolders[k] << "/" << mapName.str() << " >>" << endl;
-                oldAlgoTimeSubSum += runAgent(TEST_FOLDER + mapFolders[k] + "/" + mapName.str(), !aStarOn, logFile, !fullRun);
+                //logFile.open(testResFolder + logFileName, ios_base::app);
+                //logFile << "<< Run old agent for map " << mapFolders[k] << "/" << mapName.str() << " >>" << endl;
+                //oldAlgoTimeSubSum += runAgent(TEST_FOLDER + mapFolders[k] + "/" + mapName.str(), !aStarOn, logFile, !fullRun);
+                //logFile.close();
+
+                logFile.open(TEST_RESULTS_FOLDER + logFileName, ios_base::app);
+                logFile << "<< Run new agent for map" << mapFolders[k] << "/" << mapName.str() << " >>" << endl;
+                new1AlgoTimeSubSum += runAgent(TEST_FOLDER + mapFolders[k] + "/" + mapName.str(), aStarOn, logFile, !fullRun, *hDist);
                 logFile.close();
 
-                logFile.open(testResFolder + logFileName, ios_base::app);
+                logFile.open(TEST_RESULTS_FOLDER + logFileName, ios_base::app);
                 logFile << "<< Run new agent for map" << mapFolders[k] << "/" << mapName.str() << " >>" << endl;
-                newAlgoTimeSubSum += runAgent(TEST_FOLDER + mapFolders[k] + "/" + mapName.str(), aStarOn, logFile, !fullRun);
+                new2AlgoTimeSubSum += runAgent(TEST_FOLDER + mapFolders[k] + "/" + mapName.str(), aStarOn, logFile, !fullRun, *hDist2);
+                logFile.close();
+
+                logFile.open(TEST_RESULTS_FOLDER + logFileName, ios_base::app);
+                logFile << "<< Run new agent for map" << mapFolders[k] << "/" << mapName.str() << " >>" << endl;
+                new3AlgoTimeSubSum += runAgent(TEST_FOLDER + mapFolders[k] + "/" + mapName.str(), aStarOn, logFile, !fullRun, *hDist3);
                 logFile.close();
             }
 
             cout << endl;
 
             oldAlgoTimeSum += oldAlgoTimeSubSum / TEST_COUNT;
-            newAlgoTimeSum += newAlgoTimeSubSum / TEST_COUNT;
+            new1AlgoTimeSum += new1AlgoTimeSubSum / TEST_COUNT;
+            new2AlgoTimeSum += new2AlgoTimeSubSum / TEST_COUNT;
+            new3AlgoTimeSum += new3AlgoTimeSubSum / TEST_COUNT;
 
-            oldRes << oldAlgoTimeSubSum / TEST_COUNT << endl;
-            newRes << newAlgoTimeSubSum / TEST_COUNT << endl;
+            //oldRes << setw(10) << '"' + mapFolders[k] + '"' << setw(10) << oldAlgoTimeSubSum / TEST_COUNT << endl;
+            new1Res << setw(10) << '"' + mapFolders[k] + '"' << setw(10) << new1AlgoTimeSubSum / TEST_COUNT << endl;
+            new2Res << setw(10) << '"' + mapFolders[k] + '"' << setw(10) << new2AlgoTimeSubSum / TEST_COUNT << endl;
+            new3Res << setw(10) << '"' + mapFolders[k] + '"' << setw(10) << new3AlgoTimeSubSum / TEST_COUNT << endl;
+
+            cmpRes << setw(10) << '"' + mapFolders[k] + '"' << setw(10) << new1AlgoTimeSubSum / TEST_COUNT << setw(10) << new2AlgoTimeSubSum / TEST_COUNT << setw(10) << new3AlgoTimeSubSum / TEST_COUNT << endl;
         }
 
-        oldRes << oldAlgoTimeSum / mapCounts[k] << endl;
-        newRes << newAlgoTimeSum / mapCounts[k] << endl;
+        //oldRes << setw(10) << '"' + mapFolders[k] + '"' << setw(10) << oldAlgoTimeSum / mapCounts[k] << endl;
+        new1Res << setw(10) << '"' + mapFolders[k] + '"' << setw(10) << new1AlgoTimeSum / mapCounts[k] << endl;
+        new2Res << setw(10) << '"' + mapFolders[k] + '"' << setw(10) << new2AlgoTimeSum / mapCounts[k] << endl;
+        new3Res << setw(10) << '"' + mapFolders[k] + '"' << setw(10) << new3AlgoTimeSum / mapCounts[k] << endl;
 
-        oldRes.close();
-        newRes.close();
+        cmpRes << setw(10) << '"' + mapFolders[k] + '"' << setw(10) << new1AlgoTimeSum / mapCounts[k] << setw(10) << new2AlgoTimeSum / mapCounts[k] << setw(10) << new3AlgoTimeSum / mapCounts[k] << endl;
+
+        //oldRes.close();
+        new1Res.close();
+        new2Res.close();
+        new3Res.close();
+        cmpRes.close();
     }
 
     cout << "<< Testing compleete! >>";
@@ -290,7 +325,7 @@ int main()
     return 0;
 }
 
-lint runAgent(string filePath, bool isAstarUse, ostream& out, bool isFullRun)
+lint runAgent(string filePath, bool isAstarUse, ostream& out, bool isFullRun, heuristicDist hFun)
 {
     // Печать информации об обозначении узлов и карты
     mapInfo = readMap(filePath);
@@ -866,7 +901,7 @@ lint runAgent(string filePath, bool isAstarUse, ostream& out, bool isFullRun)
     if (isAstarUse)
     {
         Plan plan;
-        findPathAstar(plan, current_cell, R, 0, safe_cells, q, qq, mapInfo.nRow, mapInfo.nColumn, fValues, direction, dirs, actionsNext);
+        findPathAstar(plan, current_cell, R, 0, safe_cells, q, qq, mapInfo.nRow, mapInfo.nColumn, fValues, direction, dirs, actionsNext, hFun);
 
        for (int i = 0; i < plan.strPlan.size(); ++i)
         {

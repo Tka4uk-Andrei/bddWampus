@@ -13,6 +13,8 @@
 
 using namespace std;
 
+typedef uint(*heuristicDist)(int, int, int);
+
 /// <summary>
 ///     Название действия "движение вперёд"
 /// </summary>
@@ -96,6 +98,19 @@ uint hDist(int cur, int dest, int nColumn)
     return 2 * max(width, height);
 }
 
+uint hDist2(int cur, int dest, int nColumn)
+{
+    int width = abs(cur % nColumn - dest % nColumn);
+    int height = abs(cur / nColumn - dest / nColumn);
+
+    return width + height;
+}
+
+uint hDist3(int cur, int dest, int nColumn)
+{
+    return 0;
+}
+
 /// <summary>
 ///     Поиск пути между указанными узлами. Если пути нет, поведение не предсказуемо
 /// </summary>
@@ -110,10 +125,10 @@ uint hDist(int cur, int dest, int nColumn)
 /// <param name="nColumn"> -- Ширина поля </param>
 /// <param name="fValues"> -- Массив с преподсчитанными значениями функции оценки </param>
 /// <param name="iniDir"> -- начальное направление агента </param>
-void findPathAstar(Plan& plan, int startNodeNum, bdd& relation, int endNodeNum, vector<bool>& safeCells, vector<bdd>& q, vector<bdd>& qq, uint nRow, uint nColumn, vector<bdd>& fValues, bdd& iniDir, Directions& directions, TimeDependentActions& actions);
+void findPathAstar(Plan& plan, int startNodeNum, bdd& relation, int endNodeNum, vector<bool>& safeCells, vector<bdd>& q, vector<bdd>& qq, uint nRow, uint nColumn, vector<bdd>& fValues, bdd& iniDir, Directions& directions, TimeDependentActions& actions, heuristicDist hFun);
 
 
-void findPathAstar(Plan& plan, int startNodeNum, bdd& relation, int endNodeNum, vector<bool>& safeCells, vector<bdd>& q, vector<bdd>& qq, uint nRow, uint nColumn, vector<bdd>& fValues, bdd& iniDir, Directions& directions, TimeDependentActions& actions)
+void findPathAstar(Plan& plan, int startNodeNum, bdd& relation, int endNodeNum, vector<bool>& safeCells, vector<bdd>& q, vector<bdd>& qq, uint nRow, uint nColumn, vector<bdd>& fValues, bdd& iniDir, Directions& directions, TimeDependentActions& actions, heuristicDist hFun)
 {
     uint nodeCount = nRow * nColumn;
     stack<pair<int, int>> keyNodes;
@@ -177,7 +192,7 @@ void findPathAstar(Plan& plan, int startNodeNum, bdd& relation, int endNodeNum, 
             {
                 if ((neighbours & qq[nextNode]) != bddfalse)
                 {
-                    int newFval = fVal - hDist(node, endNodeNum, nColumn) + 1 + hDist(nextNode, endNodeNum, nColumn);
+                    int newFval = fVal - hFun(node, endNodeNum, nColumn) + 1 + hFun(nextNode, endNodeNum, nColumn);
 
                     // проверка на то, что соседний узел не был добавлен в очередь
                     if ((queue & q[nextNode]) != bddfalse)
@@ -205,7 +220,7 @@ void findPathAstar(Plan& plan, int startNodeNum, bdd& relation, int endNodeNum, 
         visited[node] = true;
 
         // заносим в стек раскрытых вершин
-        keyNodes.push(pair<int, int>(node, fVal - hDist(node, endNodeNum, nColumn)));
+        keyNodes.push(pair<int, int>(node, fVal - hFun(node, endNodeNum, nColumn)));
     }
 
     // Если пути до узла назначения не существует
